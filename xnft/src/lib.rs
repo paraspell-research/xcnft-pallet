@@ -199,6 +199,10 @@ pub mod pallet {
 			collection_hash: T::Hash,
 			owner: T::AccountId,
 		},
+		NonFungibleReceived {
+			nft_hash: T::Hash,
+			owner: T::AccountId,
+		},
 		NonFungibleMinted {
 			nft_hash: T::Hash,
 			owner: T::AccountId,
@@ -865,7 +869,7 @@ pub mod pallet {
 			collection_size += 1;
 			let _ = CollectionSize::<T>::insert(collection_hash, collection_size);
 
-			Self::deposit_event(Event::NonFungibleMinted { nft_hash, owner: who });
+			Self::deposit_event(Event::NonFungibleReceived { nft_hash, owner: who });
 
 			Ok(().into())
 		}
