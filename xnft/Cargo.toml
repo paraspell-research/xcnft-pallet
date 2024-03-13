@@ -23,8 +23,8 @@ frame-system = { path = "../../../../substrate/frame/system", default-features =
 #XCM
 xcm = { package = "staging-xcm", path = "../../../../polkadot/xcm", default-features = false}
 
-cumulus-primitives-core = { path = "../../../primitives/core", default-features = false }
-cumulus-pallet-xcm = { path = "../../../pallets/xcm", default-features = false }
+cumulus-primitives-core = { path = "../../../../cumulus/primitives/core", default-features = false }
+cumulus-pallet-xcm = { path = "../../../../cumulus/pallets/xcm", default-features = false }
 
 sp-runtime = { path = "../../../../substrate/primitives/runtime", default-features = false}
 sp-std = { path = "../../../../substrate/primitives/std", default-features = false}

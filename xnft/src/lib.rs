@@ -11,22 +11,20 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[frame_support::pallet]
 pub mod pallet {
 	use codec::Encode;
-	use cumulus_pallet_xcm::{ensure_sibling_para, Origin as CumulusOrigin};
 	use cumulus_primitives_core::ParaId;
 	use frame_support::{
 		pallet_prelude::*,
-		parameter_types,
 		sp_runtime::traits::Hash,
 		traits::{Currency, LockableCurrency, ReservableCurrency},
 		BoundedVec,
 	};
-	use frame_system::{
-		pallet_prelude::{OriginFor, *},
-		Config as SystemConfig,
-	};
+	use frame_system::pallet_prelude::{OriginFor, *};
 	use scale_info::prelude::vec;
 	use sp_std::prelude::*;
 	use xcm::latest::prelude::*;
@@ -67,9 +65,6 @@ pub mod pallet {
 			+ ReservableCurrency<Self::AccountId>
 			+ LockableCurrency<Self::AccountId>;
 
-		type RuntimeOrigin: From<<Self as SystemConfig>::RuntimeOrigin>
-			+ Into<Result<CumulusOrigin, <Self as Config>::RuntimeOrigin>>;
-
 		/// The overarching call type; we assume sibling chains use the same type.
 		type RuntimeCall: From<Call<Self>> + Encode;
 
@@ -84,7 +79,8 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn non_fungibles)]
-	pub type NonFungibles<T: Config> = StorageMap<_, Blake2_128Concat, T::Hash, NonFungible<T>>;
+	pub type NonFungibles<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::Hash, NonFungibleWithOwner<T>>;
 
 	//We will have storage holding collections and non-fungibles available on other chains
 	#[pallet::storage]
@@ -102,7 +98,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		ParachainID,
-		BoundedVec<NonFungible<T>, T::NFTsPerParachainLimit>,
+		BoundedVec<NonFungibleWithOwner<T>, T::NFTsPerParachainLimit>,
 	>;
 
 	//We will have storage for collections received from other chains
@@ -122,7 +118,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		ParachainID,
-		BoundedVec<NonFungible<T>, T::NFTsPerParachainLimit>,
+		BoundedVec<NonFungibleWithOwner<T>, T::NFTsPerParachainLimit>,
 	>;
 
 	//We will save collection size to storage
@@ -157,10 +153,20 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	#[codec(mel_bound())]
 	pub struct NonFungible<T: Config> {
+		pub collection_hash: T::Hash,
+		pub nft_name: BoundedString<T>,
+		pub nft_description: BoundedString<T>,
+	}
+
+	#[derive(Clone, Encode, Decode, PartialEq, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	#[codec(mel_bound())]
+	pub struct NonFungibleWithOwner<T: Config> {
 		pub owner: T::AccountId,
 		pub collection_hash: T::Hash,
 		pub nft_name: BoundedString<T>,
 		pub nft_description: BoundedString<T>,
+		pub nft_hash: T::Hash,
 	}
 
 	// Pallets use events to inform users when important changes are made.
@@ -173,12 +179,12 @@ pub mod pallet {
 		MintedNonFungibleTransfered {
 			nft_hash: T::Hash,
 			owner: T::AccountId,
-			destination: ParaId,
+			destination_parachain: ParaId,
 		},
 		NonFungibleTransfered {
 			nft_hash: T::Hash,
 			owner: T::AccountId,
-			destination: ParaId,
+			destination_parachain: ParaId,
 		},
 		CollectionCreatedAndTransferedXCM {
 			collection_hash: T::Hash,
@@ -199,10 +205,6 @@ pub mod pallet {
 			collection_hash: T::Hash,
 			owner: T::AccountId,
 		},
-		NonFungibleReceived {
-			nft_hash: T::Hash,
-			owner: T::AccountId,
-		},
 		NonFungibleMinted {
 			nft_hash: T::Hash,
 			owner: T::AccountId,
@@ -216,6 +218,12 @@ pub mod pallet {
 			collection_hash: T::Hash,
 			owner: T::AccountId,
 			destination: ParaId,
+		},
+		NonFungibleFailedToXCM {
+			e: SendError,
+			nft_hash: T::Hash,
+			owner: T::AccountId,
+			destination_parachain: ParaId,
 		},
 	}
 
@@ -232,6 +240,7 @@ pub mod pallet {
 		                                      * that already exists on other chain */
 		CollectionWasNotAddedToOtherChain, //Error that should never happen
 		CollectionWasNotAdded,             //Error that should never happen
+		NonFungibleWasNotAdded,            //Error that should never happen
 		CollectionFull,                    /* Used when user tries to add new non-fungible but
 		                                    * collection is full */
 		InvalidDestination,       //Parachain ID does not exist or is above limit
@@ -249,8 +258,8 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/*
-		TBD (ADD XCM): ADD XCM -- Function creates collection and sends it cross-chain
-		*/
+		 *Function creates collection and sends it cross-chain
+		 */
 
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
@@ -261,17 +270,14 @@ pub mod pallet {
 			destination: ParaId,
 			recipient: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin.clone())?;
-
-			//Check if paraID is within limit
-			//ensure!(destination <= T::ParaIDLimit::get(), Error::<T>::InvalidDestination);
+			let _who = ensure_signed_or_root(origin.clone())?.unwrap();
 
 			//create collection, fetch parachain ID
 			let collection: Collection<T> = Collection {
 				owner: recipient.clone(),
 				collection_name: collection_name.clone(),
 				collection_description: collection_description.clone(),
-				collection_origin_parachain_id: 2000.into(),
+				collection_origin_parachain_id: 1000.into(),
 			};
 
 			//create hash of collection
@@ -281,7 +287,7 @@ pub mod pallet {
 				owner: recipient.clone(),
 				collection_name: collection_name.clone(),
 				collection_description: collection_description.clone(),
-				collection_origin_parachain_id: 2000.into(),
+				collection_origin_parachain_id: 1000.into(),
 				collection_hash: collection_hash.clone(),
 			};
 
@@ -310,53 +316,57 @@ pub mod pallet {
 				Error::<T>::CollectionAlreadyExists
 			);
 
-			//set collection size to 0 in storage
-			let _ = CollectionSize::<T>::insert(collection_hash, 0);
-
-			//Allocate fee for XCM transfer & collection creation
-			let user_ballance = T::Currency::free_balance(&who);
-
-			//If collection does not yet exist create it and insert it into other chain collections
-			let _ = OtherChainCollections::<T>::mutate(destination, |x| -> Result<(), ()> {
-				if let Some(x) = x {
-					x.try_push(collection_with_hash).map_err(|_| ())?;
-					Ok(())
-				} else {
-					*x = Some(vec![collection_with_hash].try_into().map_err(|_| ())?);
-					Ok(())
-				}
-			});
-
-			//We check if collection was added to other chain collections
-			ensure!(
-				OtherChainCollections::<T>::get(destination)
-					.unwrap_or_default()
-					.contains(&collection_copy),
-				Error::<T>::CollectionWasNotAddedToOtherChain
-			);
-
-			//let para = ensure_sibling_para(<T as Config>::RuntimeOrigin::from(destination.clone()))?;
-
 			match send_xcm::<T::XcmSender>(
 				(Parent, Junction::Parachain(destination.into())).into(),
-				Xcm(vec![Transact {
-					origin_kind: OriginKind::Native,
-					require_weight_at_most: Weight::from_parts(1_000, 1_000),
-					call: <T as Config>::RuntimeCall::from(Call::<T>::mint_collection_received {
-						collection_name,
-						collection_description,
-						origin_parachain_id: 2000.into(),
-						owner: recipient.clone(),
-					})
-					.encode()
-					.into(),
-				}]),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config>::RuntimeCall::from(
+							Call::<T>::mint_collection_received {
+								collection_name,
+								collection_description,
+								origin_parachain_id: 1000.into(),
+								owner: recipient.clone(),
+							},
+						)
+						.encode()
+						.into(),
+					},
+				]),
 			) {
-				Ok((hash, cost)) => Self::deposit_event(Event::CollectionCreatedAndTransferedXCM {
-					collection_hash,
-					owner: recipient.clone(),
-					destination,
-				}),
+				Ok((_hash, _cost)) => {
+					//set collection size to 0 in storage
+					CollectionSize::<T>::insert(collection_hash, 0);
+
+					//If collection does not yet exist create it and insert it into other chain
+					// collections
+					let _ =
+						OtherChainCollections::<T>::mutate(destination, |x| -> Result<(), ()> {
+							if let Some(x) = x {
+								x.try_push(collection_with_hash).map_err(|_| ())?;
+								Ok(())
+							} else {
+								*x = Some(vec![collection_with_hash].try_into().map_err(|_| ())?);
+								Ok(())
+							}
+						});
+
+					//We check if collection was added to other chain collections
+					ensure!(
+						OtherChainCollections::<T>::get(destination)
+							.unwrap_or_default()
+							.contains(&collection_copy),
+						Error::<T>::CollectionWasNotAddedToOtherChain
+					);
+
+					Self::deposit_event(Event::CollectionCreatedAndTransferedXCM {
+						collection_hash,
+						owner: recipient.clone(),
+						destination,
+					})
+				},
 				Err(e) => Self::deposit_event(Event::CollectionFailedToXCM {
 					e,
 					collection_hash,
@@ -368,8 +378,8 @@ pub mod pallet {
 		}
 
 		/*
-		TBT: This function will serve for minting collections on other chains
-		*/
+		 *This function will serve for minting collections on other chains
+		 */
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
 		pub fn mint_collection_received(
@@ -379,7 +389,7 @@ pub mod pallet {
 			origin_parachain_id: ParaId,
 			owner: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed_or_root(origin)?.unwrap();
 
 			//We check if collection already exists
 			let collection: Collection<T> = Collection {
@@ -448,15 +458,15 @@ pub mod pallet {
 
 			Self::deposit_event(Event::CollectionReceived {
 				collection_hash,
-				owner: owner,
+				owner,
 				origin: origin_parachain_id,
 			});
 			Ok(().into())
 		}
-		/* 
+
 		/*
-		TBT: This function will serve for minting collections on same chain
-		*/
+		 *This function will serve for minting collections on same chain
+		 */
 		#[pallet::call_index(2)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
 		pub fn mint_collection(
@@ -464,14 +474,14 @@ pub mod pallet {
 			collection_name: BoundedString<T>,
 			collection_description: BoundedString<T>,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed_or_root(origin)?.unwrap();
 
 			//We check if collection already exists
 			let collection: Collection<T> = Collection {
 				owner: who.clone(),
 				collection_name: collection_name.clone(),
 				collection_description: collection_description.clone(),
-				collection_origin_parachain_id: T::ParachainID::get(),
+				collection_origin_parachain_id: 1000.into(),
 			};
 
 			let collection_hash = T::Hashing::hash_of(&collection);
@@ -480,7 +490,7 @@ pub mod pallet {
 				owner: who.clone(),
 				collection_name: collection_name.clone(),
 				collection_description: collection_description.clone(),
-				collection_origin_parachain_id: T::ParachainID::get(),
+				collection_origin_parachain_id: 1000.into(),
 				collection_hash: collection_hash.clone(),
 			};
 
@@ -526,17 +536,17 @@ pub mod pallet {
 		}
 
 		/*
-		TBD (Add XCM): This function sends existing collection cross-chain
-		*/
+		 *This function sends existing collection cross-chain
+		 */
 		#[pallet::call_index(3)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
 		pub fn collection_xtransfer(
 			origin: OriginFor<T>,
 			collection_hash: T::Hash,
 			destination: ParaId,
-			owner: T::AccountId,
+			recipient: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed_or_root(origin)?.unwrap();
 
 			//Make sure that the collection exists
 			ensure!(Collections::<T>::contains_key(collection_hash), Error::<T>::InvalidCollection);
@@ -569,51 +579,81 @@ pub mod pallet {
 				}
 			}
 
-			//Make sure destination is valid
-			//ensure!(destination <= T::ParaIDLimit::get(), Error::<T>::InvalidDestination);
+			let collection_with_hash_for_xcm = Collections::<T>::get(collection_hash).unwrap();
 
-			//Get collection from collections
-			let collection_with_hash = Collections::<T>::get(collection_hash).unwrap();
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config>::RuntimeCall::from(
+							Call::<T>::mint_collection_received {
+								collection_name: collection_with_hash_for_xcm.collection_name,
+								collection_description: collection_with_hash_for_xcm
+									.collection_description,
+								origin_parachain_id: 1000.into(),
+								owner: recipient.clone(),
+							},
+						)
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Get collection from collections
+					let mut collection_with_hash = Collections::<T>::get(collection_hash).unwrap();
 
-			//Remove collection from collections
-			let _ = Collections::<T>::remove(collection_hash);
+					//Remove collection from collections
+					let _ = Collections::<T>::remove(collection_hash);
 
-			//create copy of collection
-			let collection_copy = collection_with_hash.clone();
+					//create copy of collection
+					let mut collection_copy = collection_with_hash.clone();
+					collection_copy.owner = recipient.clone();
+					collection_with_hash.owner = recipient.clone();
 
-			//Put collection to other chain collections
-			let _ = OtherChainCollections::<T>::mutate(destination, |x| -> Result<(), ()> {
-				if let Some(x) = x {
-					x.try_push(collection_with_hash).map_err(|_| ())?;
-					Ok(())
-				} else {
-					*x = Some(vec![collection_with_hash].try_into().map_err(|_| ())?);
-					Ok(())
-				}
-			});
+					//Put collection to other chain collections
+					let _ =
+						OtherChainCollections::<T>::mutate(destination, |x| -> Result<(), ()> {
+							if let Some(x) = x {
+								x.try_push(collection_with_hash).map_err(|_| ())?;
+								Ok(())
+							} else {
+								*x = Some(vec![collection_with_hash].try_into().map_err(|_| ())?);
+								Ok(())
+							}
+						});
 
-			//Check if collection was added to other chain collections successfuly
-			ensure!(
-				OtherChainCollections::<T>::get(destination)
-					.unwrap_or_default()
-					.contains(&collection_copy),
-				Error::<T>::CollectionWasNotAddedToOtherChain
-			);
+					//Check if collection was added to other chain collections successfuly
+					ensure!(
+						OtherChainCollections::<T>::get(destination)
+							.unwrap_or_default()
+							.contains(&collection_copy),
+						Error::<T>::CollectionWasNotAddedToOtherChain
+					);
 
-			//THERE WILL BE XCM HERE
-
-			Self::deposit_event(Event::CollectionTransfered {
-				collection_hash,
-				owner: owner,
-				destination,
-			});
+					Self::deposit_event(Event::CollectionTransfered {
+						collection_hash,
+						owner: recipient.clone(),
+						destination,
+					})
+				},
+				Err(e) => Self::deposit_event(Event::CollectionFailedToXCM {
+					e,
+					collection_hash,
+					owner: recipient.clone(),
+					destination,
+				}),
+			}
 
 			Ok(().into())
 		}
 
 		/*
-		TBD (ADD XCM): This function creates and transfers non fungible cross-chain
-		*/
+		 *This function creates and transfers non fungible cross-chain
+		 */
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
@@ -622,13 +662,15 @@ pub mod pallet {
 			nft_name: BoundedString<T>,
 			nft_description: BoundedString<T>,
 			collection_hash: T::Hash,
-			destination: ParaId,
+			destination_parachain: ParaId,
+			origin_parachain: ParaId,
+			recipient: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed_or_root(origin)?.unwrap();
 
 			//Make sure collection exists in other chain collections under same parachain ID
 			ensure!(
-				OtherChainCollections::<T>::get(destination)
+				OtherChainCollections::<T>::get(destination_parachain)
 					.unwrap_or_default()
 					.iter()
 					.any(|x| x.collection_hash == collection_hash),
@@ -636,7 +678,8 @@ pub mod pallet {
 			);
 
 			//retrieve collection
-			let collection = OtherChainCollections::<T>::get(destination).unwrap_or_default();
+			let collection =
+				OtherChainCollections::<T>::get(destination_parachain).unwrap_or_default();
 			let coll = collection.iter().find(|x| x.collection_hash == collection_hash).unwrap();
 
 			//Make sure that the user owns the collection
@@ -649,12 +692,8 @@ pub mod pallet {
 				Error::<T>::CollectionFull
 			);
 
-			//Make sure destination is valid
-			//ensure!(destination <= T::ParaIDLimit::get(), Error::<T>::InvalidDestination);
-
 			//Lets create nft
-			let nft = NonFungible {
-				owner: who.clone(),
+			let nft: NonFungible<T> = NonFungible {
 				collection_hash: collection_hash.clone(),
 				nft_name: nft_name.clone(),
 				nft_description: nft_description.clone(),
@@ -662,17 +701,29 @@ pub mod pallet {
 
 			let nft_hash = T::Hashing::hash_of(&nft);
 
+			let nft_with_hash = NonFungibleWithOwner {
+				owner: recipient.clone(),
+				collection_hash: collection_hash.clone(),
+				nft_name: nft_name.clone(),
+				nft_description: nft_description.clone(),
+				nft_hash: nft_hash.clone(),
+			};
+
 			//Make sure there is no nft with the same hash in other chain non fungibles with same
 			// parachain ID
 			ensure!(
-				!OtherChainNonFungibles::<T>::get(destination).unwrap_or_default().contains(&nft),
+				!OtherChainNonFungibles::<T>::get(destination_parachain)
+					.unwrap_or_default()
+					.contains(&nft_with_hash),
 				Error::<T>::NonFungibleAlreadyExists
 			);
 
 			//IF NFT does not exist in other chain non fungibles, then check if it exists in
 			// received non fungibles
 			ensure!(
-				!ReceivedNonFungibles::<T>::get(destination).unwrap_or_default().contains(&nft),
+				!ReceivedNonFungibles::<T>::get(destination_parachain)
+					.unwrap_or_default()
+					.contains(&nft_with_hash),
 				Error::<T>::NonFungibleAlreadyExists
 			);
 
@@ -682,36 +733,67 @@ pub mod pallet {
 				Error::<T>::NonFungibleAlreadyExists
 			);
 
-			//Otherwise insert nft into nfts
-			let _ = OtherChainNonFungibles::<T>::mutate(destination, |x| -> Result<(), ()> {
-				if let Some(x) = x {
-					x.try_push(nft).map_err(|_| ())?;
-					Ok(())
-				} else {
-					*x = Some(vec![nft].try_into().map_err(|_| ())?);
-					Ok(())
-				}
-			});
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_parachain.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config>::RuntimeCall::from(
+							Call::<T>::mint_non_fungible_received {
+								nft_name,
+								nft_description,
+								collection_hash,
+								origin_parachain,
+								owner: recipient.clone(),
+							},
+						)
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Otherwise insert nft into nfts
+					let _ = OtherChainNonFungibles::<T>::mutate(
+						destination_parachain,
+						|x| -> Result<(), ()> {
+							if let Some(x) = x {
+								x.try_push(nft_with_hash).map_err(|_| ())?;
+								Ok(())
+							} else {
+								*x = Some(vec![nft_with_hash].try_into().map_err(|_| ())?);
+								Ok(())
+							}
+						},
+					);
 
-			//Update collection size
-			let mut collection_size = CollectionSize::<T>::get(collection_hash).unwrap();
-			collection_size += 1;
-			let _ = CollectionSize::<T>::insert(collection_hash, collection_size);
+					//Update collection size
+					let mut collection_size = CollectionSize::<T>::get(collection_hash).unwrap();
+					collection_size += 1;
+					let _ = CollectionSize::<T>::insert(collection_hash, collection_size);
 
-			//ADD XCM HERE
-
-			Self::deposit_event(Event::MintedNonFungibleTransfered {
-				nft_hash,
-				owner: who,
-				destination,
-			});
+					Self::deposit_event(Event::MintedNonFungibleTransfered {
+						nft_hash,
+						owner: recipient.clone(),
+						destination_parachain,
+					})
+				},
+				Err(e) => Self::deposit_event(Event::NonFungibleFailedToXCM {
+					e,
+					nft_hash,
+					owner: recipient.clone(),
+					destination_parachain,
+				}),
+			}
 
 			Ok(().into())
 		}
 
 		/*
-		TBTested: This function creates non fungible
-		*/
+		 *This function creates non fungible
+		 */
 
 		#[pallet::call_index(5)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
@@ -721,7 +803,7 @@ pub mod pallet {
 			nft_description: BoundedString<T>,
 			collection_hash: T::Hash,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed_or_root(origin)?.unwrap();
 
 			//Make sure that the collection exists
 			ensure!(Collections::<T>::contains_key(collection_hash), Error::<T>::InvalidCollection);
@@ -738,14 +820,21 @@ pub mod pallet {
 			);
 
 			//Lets create nft
-			let nft = NonFungible {
-				owner: who.clone(),
+			let nft: NonFungible<T> = NonFungible {
 				collection_hash: collection_hash.clone(),
 				nft_name: nft_name.clone(),
 				nft_description: nft_description.clone(),
 			};
 
 			let nft_hash = T::Hashing::hash_of(&nft);
+
+			let nft_with_hash = NonFungibleWithOwner {
+				owner: who.clone(),
+				collection_hash: collection_hash.clone(),
+				nft_name: nft_name.clone(),
+				nft_description: nft_description.clone(),
+				nft_hash: nft_hash.clone(),
+			};
 
 			//Make sure there is no nft with the same hash
 			let xcol = OtherChainNonFungibles::<T>::iter().map(|x| x.1).collect::<Vec<_>>();
@@ -754,14 +843,14 @@ pub mod pallet {
 			//Now iterate through vector and check
 			for x in xcol {
 				for y in x {
-					ensure!(y != nft, Error::<T>::NonFungibleAlreadyExists);
+					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
 				}
 			}
 
 			//Do same for received collections
 			for x in xcolec {
 				for y in x {
-					ensure!(y != nft, Error::<T>::NonFungibleAlreadyExists);
+					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
 				}
 			}
 
@@ -770,7 +859,7 @@ pub mod pallet {
 				Error::<T>::NonFungibleAlreadyExists
 			);
 
-			NonFungibles::<T>::insert(nft_hash, nft);
+			NonFungibles::<T>::insert(nft_hash, nft_with_hash);
 
 			//Update collection size
 			let mut collection_size = CollectionSize::<T>::get(collection_hash).unwrap();
@@ -783,7 +872,7 @@ pub mod pallet {
 		}
 
 		/*
-		TBTested: This function mints non-fungible on receiving chain
+		TBT: This function mints non-fungible on receiving chain
 		*/
 
 		#[pallet::call_index(6)]
@@ -793,21 +882,20 @@ pub mod pallet {
 			nft_name: BoundedString<T>,
 			nft_description: BoundedString<T>,
 			collection_hash: T::Hash,
-			destination: ParaId,
+			origin_parachain: ParaId,
+			owner: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let _who = ensure_signed_or_root(origin)?.unwrap();
 
-			let mut collections = ReceivedCollections::<T>::get(destination).unwrap_or_default();
+			let mut collections =
+				ReceivedCollections::<T>::get(origin_parachain).unwrap_or_default();
 
 			//Go through collections, if collection corresponds to collections_hash, then we found
 			// the collection, set it to new mutable variable, otherwise return error
-			let collection = collections
+			collections
 				.iter_mut()
 				.find(|collection| collection.collection_hash == collection_hash)
 				.ok_or(Error::<T>::InvalidCollection)?;
-
-			//Make sure that the user owns the collection
-			ensure!(collection.owner == who, Error::<T>::Unauthorized);
 
 			//Make sure that the collection is not full
 			ensure!(
@@ -816,18 +904,22 @@ pub mod pallet {
 				Error::<T>::CollectionFull
 			);
 
-			//Make sure destination is valid
-			//ensure!(destination <= T::ParaIDLimit::get(), Error::<T>::InvalidDestination);
-
 			//Lets create nft
-			let nft = NonFungible {
-				owner: who.clone(),
+			let nft: NonFungible<T> = NonFungible {
 				collection_hash: collection_hash.clone(),
 				nft_name: nft_name.clone(),
 				nft_description: nft_description.clone(),
 			};
 
 			let nft_hash = T::Hashing::hash_of(&nft);
+
+			let nft_with_hash = NonFungibleWithOwner {
+				owner: owner.clone(),
+				collection_hash: collection_hash.clone(),
+				nft_name: nft_name.clone(),
+				nft_description: nft_description.clone(),
+				nft_hash: nft_hash.clone(),
+			};
 
 			//Make sure there isnt same nft
 			let xcol = OtherChainNonFungibles::<T>::iter().map(|x| x.1).collect::<Vec<_>>();
@@ -836,14 +928,14 @@ pub mod pallet {
 			//Now iterate through vector and check
 			for x in xcol {
 				for y in x {
-					ensure!(y != nft, Error::<T>::NonFungibleAlreadyExists);
+					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
 				}
 			}
 
 			//Do same for received collections
 			for x in xcolec {
 				for y in x {
-					ensure!(y != nft, Error::<T>::NonFungibleAlreadyExists);
+					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
 				}
 			}
 
@@ -854,12 +946,12 @@ pub mod pallet {
 			);
 
 			//Otherwise insert nft into nfts
-			let _ = ReceivedNonFungibles::<T>::mutate(destination, |x| -> Result<(), ()> {
+			let _ = ReceivedNonFungibles::<T>::mutate(origin_parachain, |x| -> Result<(), ()> {
 				if let Some(x) = x {
-					x.try_push(nft).map_err(|_| ())?;
+					x.try_push(nft_with_hash).map_err(|_| ())?;
 					Ok(())
 				} else {
-					*x = Some(vec![nft].try_into().map_err(|_| ())?);
+					*x = Some(vec![nft_with_hash].try_into().map_err(|_| ())?);
 					Ok(())
 				}
 			});
@@ -869,22 +961,24 @@ pub mod pallet {
 			collection_size += 1;
 			let _ = CollectionSize::<T>::insert(collection_hash, collection_size);
 
-			Self::deposit_event(Event::NonFungibleReceived { nft_hash, owner: who });
+			Self::deposit_event(Event::NonFungibleMinted { nft_hash, owner: owner.clone() });
 
 			Ok(().into())
 		}
 
 		/*
-		TBD(ADD XCM): This function will send existing non-fungibles cross-chain
+		TBT: This function will send existing non-fungibles cross-chain
 		*/
 		#[pallet::call_index(7)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
 		pub fn non_fungible_xtransfer(
 			origin: OriginFor<T>,
 			nft_hash: T::Hash,
-			destination: ParaId,
+			destination_parachain: ParaId,
+			origin_parachain: ParaId,
+			recipient: T::AccountId,
 		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
+			let who = ensure_signed_or_root(origin)?.unwrap();
 
 			//Make sure that the nft exists
 			ensure!(NonFungibles::<T>::contains_key(nft_hash), Error::<T>::InvalidNonFungible);
@@ -905,7 +999,7 @@ pub mod pallet {
 
 			for x in xcol {
 				for y in x {
-					if (y.collection_hash == nft_copy.collection_hash) {
+					if y.collection_hash == nft_copy.collection_hash {
 						check = 1;
 						break;
 					}
@@ -930,37 +1024,70 @@ pub mod pallet {
 				Error::<T>::CollectionIsNotSentCrossChain
 			);
 
-			//Make sure destination is valid
-			//ensure!(destination <= T::ParaIDLimit::get(), Error::<T>::InvalidDestination);
+			match send_xcm::<T::XcmSender>(
+				(Parent, Junction::Parachain(destination_parachain.into())).into(),
+				Xcm(vec![
+					UnpaidExecution { weight_limit: Unlimited, check_origin: None },
+					Transact {
+						origin_kind: OriginKind::SovereignAccount,
+						require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
+						call: <T as Config>::RuntimeCall::from(
+							Call::<T>::mint_non_fungible_received {
+								nft_name: nft.nft_name,
+								nft_description: nft.nft_description,
+								collection_hash: nft.collection_hash,
+								origin_parachain,
+								owner: recipient.clone(),
+							},
+						)
+						.encode()
+						.into(),
+					},
+				]),
+			) {
+				Ok((_hash, _cost)) => {
+					//Get nft from non fungibles
+					let nft = NonFungibles::<T>::get(nft_hash).unwrap();
 
-			//Get nft from non fungibles
-			let nft = NonFungibles::<T>::get(nft_hash).unwrap();
+					//Remove nft from non fungibles
+					let _ = NonFungibles::<T>::remove(nft_hash);
 
-			//Remove nft from non fungibles
-			let _ = NonFungibles::<T>::remove(nft_hash);
+					//Put nft to other chain non fungibles
+					let _ = OtherChainNonFungibles::<T>::mutate(
+						destination_parachain,
+						|x| -> Result<(), ()> {
+							if let Some(x) = x {
+								x.try_push(nft).map_err(|_| ())?;
+								Ok(())
+							} else {
+								*x = Some(vec![nft].try_into().map_err(|_| ())?);
+								Ok(())
+							}
+						},
+					);
 
-			//Put nft to other chain non fungibles
-			let _ = OtherChainNonFungibles::<T>::mutate(destination, |x| -> Result<(), ()> {
-				if let Some(x) = x {
-					x.try_push(nft).map_err(|_| ())?;
-					Ok(())
-				} else {
-					*x = Some(vec![nft].try_into().map_err(|_| ())?);
-					Ok(())
-				}
-			});
+					//Check if nft was added to other chain non fungibles
+					ensure!(
+						OtherChainNonFungibles::<T>::get(destination_parachain)
+							.unwrap_or_default()
+							.contains(&nft_copy),
+						Error::<T>::NonFungibleWasNotAdded
+					);
 
-			//THERE WILL BE XCM HERE
+					Self::deposit_event(Event::NonFungibleTransfered {
+						nft_hash,
+						owner: recipient.clone(),
+						destination_parachain,
+					})
+				},
 
-			//Check if nft was added to other chain non fungibles
-			ensure!(
-				OtherChainNonFungibles::<T>::get(destination)
-					.unwrap_or_default()
-					.contains(&nft_copy),
-				Error::<T>::CollectionWasNotAddedToOtherChain
-			);
-
-			Self::deposit_event(Event::NonFungibleTransfered { nft_hash, owner: who, destination });
+				Err(e) => Self::deposit_event(Event::NonFungibleFailedToXCM {
+					e,
+					nft_hash,
+					owner: recipient.clone(),
+					destination_parachain,
+				}),
+			}
 
 			Ok(().into())
 		}
@@ -978,12 +1105,12 @@ pub mod pallet {
 			ensure_root(origin)?;
 
 			//We deposit test tokens
-			T::Currency::deposit_creating(&who, amount);
+			let _ = T::Currency::deposit_creating(&who, amount);
 
 			//We emit an event about succesful deposit
 			Self::deposit_event(Event::TokensDeposited { who, amount });
 
 			Ok(())
-		}*/
+		}
 	}
 }

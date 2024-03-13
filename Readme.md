@@ -16,7 +16,6 @@ impl pallet_parachain_xnft::Config for Runtime {
 	type CollectionsPerParachainLimit = ConstU32<9999>;
 	type NFTsPerParachainLimit = ConstU32<9999>;
 	type XcmSender = XcmRouter;
-	type RuntimeOrigin = RuntimeOrigin;
 	type RuntimeCall = RuntimeCall;
 }
 ```
@@ -32,4 +31,17 @@ also import it
 ```
 /// Import pallet xnft
 pub use pallet_parachain_xnft;
+```
+
+To make XCM work update XCM config:
+```
+AllowExplicitUnpaidExecutionFrom<Everything>,
+```
+
+Change type Call Dispatcher:
+```
+use xcm_executor::traits::WithOriginFilter;
+```
+```
+type CallDispatcher = WithOriginFilter<Self::SafeCallFilter>;
 ```

@@ -24,6 +24,9 @@ cumulus_based = true
   [parachains.collator]
   name = "parachain-A-1000-collator01"
   command = "../target/release/parachain-template-node"
+    args = [
+		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
+	]
 
 [[parachains]]
 id = 1001
@@ -32,3 +35,6 @@ cumulus_based = true
   [parachains.collator]
   name = "parachain-A-1001-collator01"
   command = "../target/release/parachain-template-node"
+  args = [
+		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
+	]

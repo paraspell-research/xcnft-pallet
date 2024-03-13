@@ -1,8 +1,8 @@
 use crate as pallet_xnft;
 
 use cumulus_primitives_core::ParaId;
-use cumulus_primitives_core::SendXcm;
-use frame_support::{parameter_types, traits::Everything};
+use frame_support::{derive_impl, parameter_types, traits::Everything};
+
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
@@ -10,23 +10,21 @@ use sp_runtime::{
 	BuildStorage,
 };
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+use pallet_balances::AccountData;
+
 type Block = frame_system::mocking::MockBlock<Test>;
-type Balance = u128;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
-	pub enum Test where
-		Block = Block,
-		NodeBlock = Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
+	pub enum Test
 	{
-		System: frame_system,
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
 		XnftModule: pallet_xnft,
 	}
 );
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
 	type BaseCallFilter = Everything;
 	type BlockWeights = ();
@@ -44,7 +42,7 @@ impl system::Config for Test {
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<Balance>;
+	type AccountData = AccountData<u128>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -66,7 +64,6 @@ impl pallet_balances::Config for Test {
 	type RuntimeHoldReason = ();
 	type RuntimeFreezeReason = ();
 	type FreezeIdentifier = ();
-	type MaxHolds = ();
 	type MaxFreezes = ();
 }
 
@@ -83,7 +80,7 @@ parameter_types! {
 	pub const MaxPayloadSize: u32 = 1024;
 
 	//Parachain ID - this has to be set by parachain team
-	pub const RegistryParaId: ParaId = 2000;
+	pub const RegistryParaId: ParaId = ParaId::new(2);
 
 	//Max Amount of collections we will store per parachain
 	pub const RegistryPerParachainCollectionLimit: u8 = 255;
@@ -91,6 +88,7 @@ parameter_types! {
 	//Max Amount of NFTs we will store per parachain
 	pub const RegistryNFTsPerParachainLimit: u32 = 255*255;
 }
+pub type XcmRouter = ();
 
 impl pallet_xnft::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
@@ -99,9 +97,10 @@ impl pallet_xnft::Config for Test {
 	type JsonLimit = RegistryJsonLimit;
 	type CollectionLimit = RegistryCollectionLimit;
 	type ParaIDLimit = RegistryParaIDLimit;
-	type ParaIDs = RegistryParaId;
 	type CollectionsPerParachainLimit = RegistryPerParachainCollectionLimit;
 	type NFTsPerParachainLimit = RegistryNFTsPerParachainLimit;
+	type RuntimeCall = RuntimeCall;
+	type XcmSender = XcmRouter;
 }
 
 // Build genesis storage according to the mock runtime.
