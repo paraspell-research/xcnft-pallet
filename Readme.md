@@ -45,3 +45,13 @@ use xcm_executor::traits::WithOriginFilter;
 ```
 type CallDispatcher = WithOriginFilter<Self::SafeCallFilter>;
 ```
+
+
+Testing benchmarks (Needs to be implemented in runtime already)
+```
+cargo test --package pallet-parachain-xnft --features runtime-benchmarks
+```
+Unit tests (Needs to be implemented in runtime already)
+```
+cargo test --package pallet-parachain-xnft --lib -- tests --nocapture 
+```
