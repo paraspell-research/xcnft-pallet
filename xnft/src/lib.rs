@@ -225,6 +225,21 @@ pub mod pallet {
 			owner: T::AccountId,
 			destination_parachain: ParaId,
 		},
+		CollectionAlreadyExistsOnChain {
+			collection_hash: T::Hash,
+		},
+		CollectionWasNotReceived {
+			collection_hash: T::Hash,
+		},
+		ReceivingCollectionFull {
+			collection_hash: T::Hash,
+		},
+		NonFungibleAlreadyExisting {
+			nft_hash: T::Hash,
+		},
+		InvalidReceivingCollection {
+			collection_hash: T::Hash,
+		},
 	}
 
 	// Errors inform users that something went wrong.
@@ -243,10 +258,9 @@ pub mod pallet {
 		NonFungibleWasNotAdded,            //Error that should never happen
 		CollectionFull,                    /* Used when user tries to add new non-fungible but
 		                                    * collection is full */
-		InvalidDestination,       //Parachain ID does not exist or is above limit
-		InvalidAccount,           //Account provided is not correct
-		InsufficientBalance,      //Insufficient balance to send XCM
-		CollectionWasNotReceived, //If collection exists perhaps, then do not add it again
+		InvalidDestination,  //Parachain ID does not exist or is above limit
+		InvalidAccount,      //Account provided is not correct
+		InsufficientBalance, //Insufficient balance to send XCM
 		NonFungibleAlreadyExists,
 		CollectionIsNotSentCrossChain, /* Used when user tries to mint non fungible from other
 		                                * chain */
@@ -374,7 +388,7 @@ pub mod pallet {
 					destination,
 				}),
 			}
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
@@ -418,21 +432,31 @@ pub mod pallet {
 			//Now iterate through vector and check
 			for x in xcol {
 				for y in x {
-					ensure!(y != collection_with_hash, Error::<T>::CollectionAlreadyExists);
+					if y == collection_with_hash {
+						Self::deposit_event(Event::<T>::CollectionAlreadyExistsOnChain {
+							collection_hash,
+						});
+						return Ok(())
+					};
 				}
 			}
 
 			//Do same for received collections
 			for x in xcolec {
 				for y in x {
-					ensure!(y != collection_with_hash, Error::<T>::CollectionAlreadyExists);
+					if y == collection_with_hash {
+						Self::deposit_event(Event::<T>::CollectionAlreadyExistsOnChain {
+							collection_hash,
+						});
+						return Ok(())
+					};
 				}
 			}
 
-			ensure!(
-				!Collections::<T>::contains_key(collection_hash),
-				Error::<T>::CollectionAlreadyExists
-			);
+			if Collections::<T>::contains_key(collection_hash) {
+				Self::deposit_event(Event::<T>::CollectionAlreadyExistsOnChain { collection_hash });
+				return Ok(())
+			};
 
 			//Add collection number of nfts to collection size
 			let _ = CollectionSize::<T>::insert(collection_hash, 0);
@@ -449,19 +473,20 @@ pub mod pallet {
 			});
 
 			//We check if collection was added to received collections
-			ensure!(
-				ReceivedCollections::<T>::get(origin_parachain_id)
-					.unwrap_or_default()
-					.contains(&collection_copy),
-				Error::<T>::CollectionWasNotReceived
-			);
+			if !ReceivedCollections::<T>::get(origin_parachain_id)
+				.unwrap_or_default()
+				.contains(&collection_copy)
+			{
+				Self::deposit_event(Event::<T>::CollectionWasNotReceived { collection_hash });
+				return Ok(())
+			};
 
 			Self::deposit_event(Event::CollectionReceived {
 				collection_hash,
 				owner,
 				origin: origin_parachain_id,
 			});
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
@@ -532,7 +557,7 @@ pub mod pallet {
 			Self::deposit_event(Event::CollectionMinted { collection_hash, owner: who });
 
 			//We check if collection already exists
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
@@ -648,7 +673,7 @@ pub mod pallet {
 				}),
 			}
 
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
@@ -788,7 +813,7 @@ pub mod pallet {
 				}),
 			}
 
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
@@ -868,11 +893,11 @@ pub mod pallet {
 
 			Self::deposit_event(Event::NonFungibleMinted { nft_hash, owner: who });
 
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
-		TBT: This function mints non-fungible on receiving chain
+		This function mints non-fungible on receiving chain
 		*/
 
 		#[pallet::call_index(6)]
@@ -887,22 +912,26 @@ pub mod pallet {
 		) -> DispatchResult {
 			let _who = ensure_signed_or_root(origin)?.unwrap();
 
-			let mut collections =
-				ReceivedCollections::<T>::get(origin_parachain).unwrap_or_default();
+			let collections = ReceivedCollections::<T>::get(origin_parachain).unwrap_or_default();
 
 			//Go through collections, if collection corresponds to collections_hash, then we found
 			// the collection, set it to new mutable variable, otherwise return error
-			collections
-				.iter_mut()
+			if collections
+				.iter()
 				.find(|collection| collection.collection_hash == collection_hash)
-				.ok_or(Error::<T>::InvalidCollection)?;
+				.is_none()
+			{
+				Self::deposit_event(Event::InvalidReceivingCollection { collection_hash });
+				return Ok(())
+			};
 
 			//Make sure that the collection is not full
-			ensure!(
-				CollectionSize::<T>::get(collection_hash).unwrap_or_default() <
-					T::CollectionLimit::get(),
-				Error::<T>::CollectionFull
-			);
+			if CollectionSize::<T>::get(collection_hash).unwrap_or_default() >
+				T::CollectionLimit::get()
+			{
+				Self::deposit_event(Event::ReceivingCollectionFull { collection_hash });
+				return Ok(())
+			};
 
 			//Lets create nft
 			let nft: NonFungible<T> = NonFungible {
@@ -928,22 +957,28 @@ pub mod pallet {
 			//Now iterate through vector and check
 			for x in xcol {
 				for y in x {
-					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
+					if y == nft_with_hash {
+						Self::deposit_event(Event::<T>::NonFungibleAlreadyExisting { nft_hash });
+						return Ok(())
+					};
 				}
 			}
 
 			//Do same for received collections
 			for x in xcolec {
 				for y in x {
-					ensure!(y != nft_with_hash, Error::<T>::NonFungibleAlreadyExists);
+					if y == nft_with_hash {
+						Self::deposit_event(Event::<T>::NonFungibleAlreadyExisting { nft_hash });
+						return Ok(())
+					};
 				}
 			}
 
 			//Check if non fungible is not minted
-			ensure!(
-				!NonFungibles::<T>::contains_key(nft_hash),
-				Error::<T>::NonFungibleAlreadyExists
-			);
+			if NonFungibles::<T>::contains_key(nft_hash) {
+				Self::deposit_event(Event::<T>::NonFungibleAlreadyExisting { nft_hash });
+				return Ok(())
+			}
 
 			//Otherwise insert nft into nfts
 			let _ = ReceivedNonFungibles::<T>::mutate(origin_parachain, |x| -> Result<(), ()> {
@@ -963,11 +998,11 @@ pub mod pallet {
 
 			Self::deposit_event(Event::NonFungibleMinted { nft_hash, owner: owner.clone() });
 
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
-		TBT: This function will send existing non-fungibles cross-chain
+		This function will send existing non-fungibles cross-chain
 		*/
 		#[pallet::call_index(7)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]
@@ -1089,11 +1124,11 @@ pub mod pallet {
 				}),
 			}
 
-			Ok(().into())
+			Ok(())
 		}
 
 		/*
-		DONE: Function to allow sudo add balance // FOR TESTING PURPOSE ONLY
+		Function to allow sudo add balance // FOR TESTING PURPOSE ONLY
 		*/
 		#[pallet::call_index(8)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().reads_writes(1,1))]

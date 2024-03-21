@@ -4,10 +4,10 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as Template;
 
+use cumulus_primitives_core::ParaId;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use sp_runtime::traits::Hash;
-use cumulus_primitives_core::ParaId;
 
 #[benchmarks]
 mod benchmarks {
@@ -19,7 +19,6 @@ mod benchmarks {
 
 		#[extrinsic_call]
 		mint_collection(RawOrigin::Signed(caller),b"pHgJCOTaAPedH0mtvRVVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(), b"pHgJCOTaAPEceLC69VVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap());
-
 	}
 
 	#[benchmark]
@@ -48,20 +47,18 @@ mod benchmarks {
 
 		#[extrinsic_call]
 		mint_non_fungible(RawOrigin::Signed(caller),b"pHgJCOTaAPedH0mtvRVVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(), b"pHgJCOTaAPEceLC69VVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(),collection_hash);
-
 	}
 
 	#[benchmark]
-	fn mint_collection_received_large(){
+	fn mint_collection_received_large() {
 		let caller: T::AccountId = whitelisted_caller();
 
 		#[extrinsic_call]
 		mint_collection_received(RawOrigin::Signed(caller),b"pHgJCOTaAPedH0mtvRVVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(), b"pHgJCOTaAPEceLC69VVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(),1000.into(), caller.clone());
 	}
-	
 
 	#[benchmark]
-	fn mint_non_fungible_received_large(){
+	fn mint_non_fungible_received_large() {
 		let caller: T::AccountId = whitelisted_caller();
 
 		let collection: pallet::Collection<T> = Collection {
@@ -96,7 +93,6 @@ mod benchmarks {
 
 		#[extrinsic_call]
 		mint_non_fungible_received(RawOrigin::Signed(caller),b"pHgJCOTaAPedH0mtvRVVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(), b"pHgJCOTaAPEceLC69VVtYyApzDcR0WebyTdJw1sSIRTozxXKFI3cA91Yv3ZzFk5ZH00J2SC7a3aFDrlt5rPIpwGO5UE6jSplFqdu7AhoEf8t7D6aD5CDBGOL8AZnllhAIBKBLgspdsSGoacIWx0CLFpPF2ALtm1iitrDo4B39sZC2ne9PGFIe4C1PazXLnWwbF0Kea3akaoNv6HRqKWgFNv4VTxdhCoWDsAzbzzP3GSyBYuSwBlhXP".to_vec().try_into().unwrap(),collection_hash, 0.into(), caller.clone());
-
 	}
 
 	impl_benchmark_test_suite!(Template, crate::mock::new_test_ext(), crate::mock::Test);

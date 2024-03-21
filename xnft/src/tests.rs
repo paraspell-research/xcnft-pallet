@@ -83,16 +83,20 @@ fn try_receive_existing_collection() {
 		);
 
 		//Try receiving new collection
-		assert_noop!(
-			XnftModule::mint_collection_received(
-				RuntimeOrigin::signed(1),
-				b"Collection".to_vec().try_into().unwrap(),
-				b"Description".to_vec().try_into().unwrap(),
-				1000.into(),
-				1,
-			),
-			Error::<Test>::CollectionAlreadyExists
+		let _ = XnftModule::mint_collection_received(
+			RuntimeOrigin::signed(1),
+			b"Collection".to_vec().try_into().unwrap(),
+			b"Description".to_vec().try_into().unwrap(),
+			1000.into(),
+			1,
 		);
+
+		let collection_hash: H256 =
+			"0x06fa4188b7fa31e8b2d21dc94819e22684f9e2e3995f2ca3716404e2df6b3cf0"
+				.parse()
+				.unwrap();
+
+		System::assert_last_event(Event::CollectionAlreadyExistsOnChain { collection_hash }.into());
 	});
 }
 
@@ -482,17 +486,16 @@ fn mint_non_fungible_received_to_non_existing_collection() {
 				.parse()
 				.unwrap();
 
-		assert_noop!(
-			XnftModule::mint_non_fungible_received(
-				RuntimeOrigin::signed(1),
-				b"NFT".to_vec().try_into().unwrap(),
-				b"Description".to_vec().try_into().unwrap(),
-				collection_hash,
-				2000.into(),
-				1,
-			),
-			Error::<Test>::InvalidCollection
+		let _ = XnftModule::mint_non_fungible_received(
+			RuntimeOrigin::signed(1),
+			b"NFT".to_vec().try_into().unwrap(),
+			b"Description".to_vec().try_into().unwrap(),
+			collection_hash,
+			2000.into(),
+			1,
 		);
+
+		System::assert_last_event(Event::InvalidReceivingCollection { collection_hash }.into());
 	});
 }
 
@@ -519,7 +522,7 @@ fn mint_non_fungible_received_collection_full() {
 				.unwrap();
 
 		//Mint collection in for cycle
-		for i in 0..255 {
+		for i in 0..257 {
 			let description = format!("Hi {}", i);
 			let bytes_desc = description.as_bytes();
 			let _ = XnftModule::mint_non_fungible_received(
@@ -532,18 +535,7 @@ fn mint_non_fungible_received_collection_full() {
 			);
 		}
 
-		//Try minting one more
-		assert_noop!(
-			XnftModule::mint_non_fungible_received(
-				RuntimeOrigin::signed(1),
-				b"NFT".to_vec().try_into().unwrap(),
-				b"Hola".to_vec().try_into().unwrap(),
-				collection_hash,
-				1000.into(),
-				1,
-			),
-			Error::<Test>::CollectionFull
-		);
+		System::assert_last_event(Event::ReceivingCollectionFull { collection_hash }.into());
 	});
 }
 
@@ -569,7 +561,6 @@ fn mint_non_fungible_received_already_exists() {
 				.parse()
 				.unwrap();
 
-		//Mint collection in for cycle
 		let _ = XnftModule::mint_non_fungible_received(
 			RuntimeOrigin::signed(1),
 			b"NFT".to_vec().try_into().unwrap(),
@@ -579,18 +570,21 @@ fn mint_non_fungible_received_already_exists() {
 			1,
 		);
 
-		//Try minting one more
-		assert_noop!(
-			XnftModule::mint_non_fungible_received(
-				RuntimeOrigin::signed(1),
-				b"NFT".to_vec().try_into().unwrap(),
-				b"Description".to_vec().try_into().unwrap(),
-				collection_hash,
-				1000.into(),
-				1,
-			),
-			Error::<Test>::NonFungibleAlreadyExists
+		let _ = XnftModule::mint_non_fungible_received(
+			RuntimeOrigin::signed(1),
+			b"NFT".to_vec().try_into().unwrap(),
+			b"Description".to_vec().try_into().unwrap(),
+			collection_hash,
+			1000.into(),
+			1,
 		);
+
+		let nft_hash: H256 = "0xe23ba5b8b703c74cf4c1da0245d4d7a69074e8d283c35f80efbe38a07dc34870"
+			.parse()
+			.unwrap();
+
+		//Try minting one more
+		System::assert_last_event(Event::NonFungibleAlreadyExisting { nft_hash }.into());
 	});
 }
 
@@ -692,7 +686,13 @@ fn non_fungible_xtransfer_unauthorized() {
 
 		//Send without permission
 		assert_noop!(
-			XnftModule::non_fungible_xtransfer(RuntimeOrigin::signed(2), nft_hash, 2000.into(), 1000.into(), 1,),
+			XnftModule::non_fungible_xtransfer(
+				RuntimeOrigin::signed(2),
+				nft_hash,
+				2000.into(),
+				1000.into(),
+				1,
+			),
 			Error::<Test>::Unauthorized
 		);
 	});
@@ -731,7 +731,13 @@ fn non_fungible_xtransfer_not_sent() {
 
 		//Send without permission
 		assert_noop!(
-			XnftModule::non_fungible_xtransfer(RuntimeOrigin::signed(1), nft_hash, 2000.into(), 1000.into(), 1,),
+			XnftModule::non_fungible_xtransfer(
+				RuntimeOrigin::signed(1),
+				nft_hash,
+				2000.into(),
+				1000.into(),
+				1,
+			),
 			Error::<Test>::CollectionIsNotSentCrossChain
 		);
 	});
