@@ -1,0 +1,82 @@
+[package]
+name = "pallet-parachain-xcnft"
+authors = ["ParaSpell Foundation"]
+description = "Pallet for NFT sharing using XCM."
+version = "0.1.0"
+license = "MIT"
+homepage = "https://docs.paraspell.io"
+repository.workspace = true
+edition.workspace = true
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { features = [
+	"derive",
+], workspace = true }
+scale-info = { features = [
+	"derive",
+], workspace = true }
+
+# Substrate
+frame-benchmarking = { optional = true, workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+
+#XCM
+xcm = { workspace = true}
+
+cumulus-primitives-core = { workspace = true }
+cumulus-pallet-xcm = { workspace = true }
+parachain-info = { workspace = true }
+
+
+sp-runtime = { workspace = true }
+sp-std = {workspace = true}
+
+pallet-uniques = { workspace = true, default-features = false }
+pallet-nfts = {workspace=true, default-features = false}
+
+[dev-dependencies]
+serde = { version = "1.0.210", default-features = false }
+
+# Substrate
+sp-core = { workspace = true, default-features = true }
+sp-io = { workspace = true, default-features = true }
+
+pallet-balances = { workspace = true, default-features = true }
+
+[features]
+default = [ "std" ]
+runtime-benchmarks = [
+	"frame-benchmarking/runtime-benchmarks",
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]
+std = [
+	"codec/std",
+	"scale-info/std",
+	"pallet-uniques/std",
+	"frame-benchmarking?/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-nfts/std",
+	"sp-runtime/std",
+	"cumulus-pallet-xcm/std",
+	"cumulus-primitives-core/std",
+	"sp-std/std",
+	"xcm/std",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"parachain-info/std",
+]
+try-runtime = [
+	"cumulus-pallet-xcm/try-runtime",
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
+	"sp-runtime/try-runtime",
+	"parachain-info/try-runtime",
+]
