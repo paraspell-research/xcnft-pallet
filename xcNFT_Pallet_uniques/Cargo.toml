@@ -1,5 +1,5 @@
 [package]
-name = "pallet-parachain-xcnft"
+name = "pallet-parachain-xcnft-two"
 authors = ["ParaSpell Foundation"]
 description = "Pallet for NFT sharing using XCM."
 version = "0.1.0"
@@ -24,6 +24,7 @@ scale-info = { features = [
 frame-benchmarking = { optional = true, workspace = true }
 frame-support = { workspace = true }
 frame-system = { workspace = true }
+enumflags2 = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
@@ -36,7 +37,7 @@ parachain-info = { workspace = true }
 sp-runtime = { workspace = true }
 sp-std = {workspace = true}
 
-pallet-nfts = {workspace=true, default-features = false}
+pallet-uniques = { workspace = true, default-features = false }
 
 [dev-dependencies]
 serde = { version = "1.0.210", default-features = false }
@@ -58,10 +59,10 @@ runtime-benchmarks = [
 std = [
 	"codec/std",
 	"scale-info/std",
+	"pallet-uniques/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
-	"pallet-nfts/std",
 	"sp-runtime/std",
 	"cumulus-pallet-xcm/std",
 	"cumulus-primitives-core/std",

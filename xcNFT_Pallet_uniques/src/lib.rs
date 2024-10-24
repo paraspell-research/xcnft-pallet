@@ -54,7 +54,10 @@
 //! - `pallet-uniques`
 //! - `pallet-balances`
 //! - `parachain-info`
-
+//! 
+//! Other pallets:
+//! - `enumflags2``
+//! 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
@@ -70,18 +73,25 @@ pub mod weights;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub mod xmacros;
+
 #[frame_support::pallet]
 pub mod pallet {
 
+	use codec::EncodeLike;
 	use core::marker::PhantomData;
 	use cumulus_primitives_core::ParaId;
 	use frame_support::{
 		dispatch::{DispatchResultWithPostInfo, PostDispatchInfo},
 		pallet_prelude::*,
-		traits::Incrementable,
+		traits::Currency,
 	};
+	use scale_info::{build::Fields, meta_type, Path, Type, TypeInfo, TypeParameter};
+
+	use crate::xmacros::impl_codec_bitflags;
+	use enumflags2::{bitflags, BitFlags};
 	use frame_system::pallet_prelude::*;
-	use pallet_nfts::{CollectionConfigFor, CollectionSettings, DestroyWitness, MintSettings};
+	use pallet_uniques::DestroyWitness;
 	use scale_info::prelude::vec;
 	use sp_runtime::{traits::StaticLookup, DispatchError, DispatchErrorWithPostInfo};
 	use sp_std::prelude::*;
@@ -91,7 +101,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config<I: 'static = ()>:
-		frame_system::Config + pallet_nfts::Config<I> + parachain_info::Config
+		frame_system::Config + pallet_uniques::Config<I> + parachain_info::Config
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self, I>>
@@ -124,6 +134,127 @@ pub mod pallet {
 		item_meta: u32,
 		item_configs: u32,
 		attributes: u32,
+	}
+
+	/// Following struct is abstracted from pallet_nfts and is meant to replicate CollectionConfig
+	/// in case, that the user wishes to provide collection config compatible with pallet_nfts
+	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
+	#[scale_info(skip_type_params(T))]
+	pub struct CollectionConfig<Price, BlockNumber, CollectionId> {
+		pub settings: CollectionSettings,
+		pub max_supply: Option<u32>,
+		pub mint_settings: MintSettings<Price, BlockNumber, CollectionId>,
+	}
+
+	/// Following type is abstracted from pallet_nfts and is meant to replicate CollectionConfigFor
+	/// in case, that the user wishes to provide collection config compatible with pallet_nfts
+	pub type CollectionConfigFor<T, I = (), CollectionId = ()> =
+		CollectionConfig<BalanceOf<T, I>, BlockNumberFor<T>, CollectionId>;
+
+	/// Following enum is abstracted from pallet_nfts and is meant to replicate MintType in case,
+	/// that the user wishes to provide collection config compatible with pallet_nfts
+	#[derive(Clone, Copy, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub enum MintType<CollectionId> {
+		Issuer,
+		Public,
+		HolderOf(CollectionId),
+	}
+
+	/// Following type is abstracted from pallet_nfts and is meant to replicate BalanceOf in case,
+	/// that the user wishes to provide collection config compatible with pallet_nfts
+	pub type BalanceOf<T, I = ()> = <<T as pallet_uniques::Config<I>>::Currency as Currency<
+		<T as frame_system::Config>::AccountId,
+	>>::Balance;
+
+	/// Following struct is abstracted from pallet_nfts and is meant to replicate CollectionSettings
+	/// in case, that the user wishes to provide collection config compatible with pallet_nfts
+	#[derive(Clone, Copy, PartialEq, Eq, Default, RuntimeDebug)]
+	pub struct CollectionSettings(pub BitFlags<CollectionSetting>);
+
+	impl CollectionSettings {
+		pub fn all_enabled() -> Self {
+			Self(BitFlags::EMPTY)
+		}
+		pub fn get_disabled(&self) -> BitFlags<CollectionSetting> {
+			self.0
+		}
+		pub fn is_disabled(&self, setting: CollectionSetting) -> bool {
+			self.0.contains(setting)
+		}
+		pub fn from_disabled(settings: BitFlags<CollectionSetting>) -> Self {
+			Self(settings)
+		}
+	}
+
+	/// Following enum is abstracted from pallet_nfts and is meant to replicate CollectionSetting in
+	/// case, that the user wishes to provide collection config compatible with pallet_nfts
+	#[bitflags]
+	#[repr(u64)]
+	#[derive(Copy, Clone, RuntimeDebug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+	pub enum CollectionSetting {
+		TransferableItems,
+		UnlockedMetadata,
+		UnlockedAttributes,
+		UnlockedMaxSupply,
+		DepositRequired,
+	}
+
+	impl_codec_bitflags!(CollectionSettings, u64, CollectionSetting);
+
+	/// Following struct is abstracted from pallet_nfts and is meant to replicate ItemSettings in
+	/// case, that the user wishes to provide collection config compatible with pallet_nfts
+	#[derive(Clone, Copy, PartialEq, Eq, Default, RuntimeDebug)]
+	pub struct ItemSettings(pub BitFlags<ItemSetting>);
+
+	impl ItemSettings {
+		pub fn all_enabled() -> Self {
+			Self(BitFlags::EMPTY)
+		}
+		pub fn get_disabled(&self) -> BitFlags<ItemSetting> {
+			self.0
+		}
+		pub fn is_disabled(&self, setting: ItemSetting) -> bool {
+			self.0.contains(setting)
+		}
+		pub fn from_disabled(settings: BitFlags<ItemSetting>) -> Self {
+			Self(settings)
+		}
+	}
+
+	/// Following enum is abstracted from pallet_nfts and is meant to replicate ItemSetting in case,
+	/// that the user wishes to provide collection config compatible with pallet_nfts
+	#[bitflags]
+	#[repr(u64)]
+	#[derive(Copy, Clone, RuntimeDebug, PartialEq, Eq, Encode, Decode, MaxEncodedLen, TypeInfo)]
+	pub enum ItemSetting {
+		Transferable,
+		UnlockedMetadata,
+		UnlockedAttributes,
+	}
+
+	impl_codec_bitflags!(ItemSettings, u64, ItemSetting);
+
+	/// Following struct is abstracted from pallet_nfts and is meant to replicate MintSettings in
+	/// case, that the user wishes to provide collection config compatible with pallet_nfts
+	#[derive(Clone, Copy, Encode, Decode, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	pub struct MintSettings<Price, BlockNumber, CollectionId> {
+		pub mint_type: MintType<CollectionId>,
+		pub price: Option<Price>,
+		pub start_block: Option<BlockNumber>,
+		pub end_block: Option<BlockNumber>,
+		pub default_item_settings: ItemSettings,
+	}
+
+	impl<Price, BlockNumber, CollectionId> Default for MintSettings<Price, BlockNumber, CollectionId> {
+		fn default() -> Self {
+			Self {
+				mint_type: MintType::Issuer,
+				price: None,
+				start_block: None,
+				end_block: None,
+				default_item_settings: ItemSettings::all_enabled(),
+			}
+		}
 	}
 
 	/// Enum for voting, either Aye or Nay option.
@@ -504,6 +635,10 @@ pub mod pallet {
 
 		/// Event emitted when collection fails to mint on destination chain
 		CollectionMintFailed { error: DispatchError },
+
+		/// Event emitted when receiving collection cannot be created due to collection storage
+		/// being full.
+		CollectionListFull { owner: AccountIdLookupOf<T> },
 	}
 
 	#[pallet::error]
@@ -579,7 +714,7 @@ pub mod pallet {
 		pub fn collection_x_transfer(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
-			destination_collection: Option<T::CollectionId>,
+			dest_collection_id: Option<T::CollectionId>,
 			destination_para: ParaId,
 			config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
@@ -587,13 +722,13 @@ pub mod pallet {
 
 			// See if collection exists
 			ensure!(
-				pallet_nfts::Collection::<T, I>::contains_key(&origin_collection),
+				pallet_uniques::Collection::<T, I>::contains_key(&origin_collection.clone()),
 				Error::<T, I>::CollectionDoesNotExist
 			);
 
 			// See if user owns the collection
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::collection_owner(origin_collection.clone())
+				pallet_uniques::Pallet::<T, I>::collection_owner(origin_collection.clone())
 					.ok_or(Error::<T, I>::CollectionDoesNotExist)? ==
 					who.clone(),
 				Error::<T, I>::NotCollectionOwner
@@ -603,16 +738,20 @@ pub mod pallet {
 			let mut items = Vec::new();
 
 			for (item_id, _item_details) in
-				pallet_nfts::Item::<T, I>::iter_prefix(&origin_collection)
+				pallet_uniques::Item::<T, I>::iter_prefix(&origin_collection.clone())
 			{
 				items.push(item_id);
 			}
 
 			// First check if collection contains any metadata if it does, then save it
 			let mut collection_metadata = None;
-			if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(&origin_collection) {
+			if pallet_uniques::CollectionMetadataOf::<T, I>::contains_key(
+				&origin_collection.clone(),
+			) {
 				collection_metadata = Some(
-					pallet_nfts::CollectionMetadataOf::<T, I>::get(origin_collection).unwrap().data,
+					pallet_uniques::CollectionMetadataOf::<T, I>::get(origin_collection.clone())
+						.unwrap()
+						.data,
 				);
 			}
 
@@ -644,7 +783,7 @@ pub mod pallet {
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_empty {
 									origin_collection: origin_collection.clone(),
-									destination_collection,
+									destination_collection: dest_collection_id.clone(),
 									collection_metadata: collection_metadata.clone().unwrap(),
 									config,
 								},
@@ -656,23 +795,24 @@ pub mod pallet {
 				) {
 					Ok((_hash, _cost)) => {
 						// If collection was received, remove from received collections
-						if ReceivedCollections::<T, I>::contains_key(&origin_collection) {
-							ReceivedCollections::<T, I>::remove(&origin_collection);
+						if ReceivedCollections::<T, I>::contains_key(&origin_collection.clone()) {
+							ReceivedCollections::<T, I>::remove(&origin_collection.clone());
 						}
 
 						// Get collection from the storage
 						let collection =
-							pallet_nfts::Collection::<T, I>::get(origin_collection).unwrap();
+							pallet_uniques::Collection::<T, I>::get(origin_collection.clone())
+								.unwrap();
 
 						// Create destroy witness type
 						let destroy_witness = DestroyWitness {
+							items: collection.clone().items,
 							item_metadatas: collection.clone().item_metadatas,
-							item_configs: collection.clone().item_configs,
 							attributes: collection.attributes,
 						};
 
 						// Burn the collection on origin chain
-						let _ = pallet_nfts::Pallet::<T, I>::destroy(
+						let _ = pallet_uniques::Pallet::<T, I>::destroy(
 							origin.clone(),
 							origin_collection.clone(),
 							destroy_witness,
@@ -680,14 +820,14 @@ pub mod pallet {
 
 						// Emit an success event
 						Self::deposit_event(Event::CollectionTransferred {
-							origin_collection_id: origin_collection,
+							origin_collection_id: origin_collection.clone(),
 							origin_collection_metadata: collection_metadata.unwrap(),
 							destination_para_id: destination_para,
 						});
 					},
 					Err(e) => Self::deposit_event(Event::CollectionFailedToXCM {
 						e,
-						collection_id: origin_collection,
+						collection_id: origin_collection.clone(),
 						owner: who.clone(),
 						destination: destination_para,
 					}),
@@ -698,11 +838,11 @@ pub mod pallet {
 
 				for item_id in items.clone() {
 					if let Some(nft_owner) =
-						pallet_nfts::Pallet::<T, I>::owner(origin_collection, item_id)
+						pallet_uniques::Pallet::<T, I>::owner(origin_collection.clone(), item_id)
 					{
 						if nft_owner != collection_owner {
 							for (_data, proposal) in CrossChainProposals::<T, I>::iter() {
-								if proposal.collection_id == origin_collection {
+								if proposal.collection_id == origin_collection.clone() {
 									return Err(Error::<T, I>::ProposalAlreadyExists.into());
 								}
 							}
@@ -711,9 +851,10 @@ pub mod pallet {
 							let mut different_owners = BoundedVec::new();
 
 							for item_id in items.clone() {
-								if let Some(nft_owner) =
-									pallet_nfts::Pallet::<T, I>::owner(origin_collection, item_id)
-								{
+								if let Some(nft_owner) = pallet_uniques::Pallet::<T, I>::owner(
+									origin_collection.clone(),
+									item_id,
+								) {
 									if nft_owner != collection_owner {
 										// Check if owner is not present in different owners
 										if !different_owners.contains(&nft_owner) {
@@ -741,11 +882,11 @@ pub mod pallet {
 
 							let proposal = Proposal::<T, I> {
 								proposal_id,
-								collection_id: origin_collection,
+								collection_id: origin_collection.clone(),
 								proposed_collection_owner: who.clone(),
-								proposed_destination_config: config,
-								proposed_dest_collection_id: destination_collection,
 								proposed_destination_para: destination_para,
+								proposed_destination_config: config.clone(),
+								proposed_dest_collection_id: dest_collection_id,
 								owners: different_owners,
 								number_of_votes: Votes {
 									aye: BoundedVec::new(),
@@ -758,7 +899,7 @@ pub mod pallet {
 
 							Self::deposit_event(Event::CollectionTransferProposalCreated {
 								proposal_id,
-								collection_id: origin_collection,
+								collection_id: origin_collection.clone(),
 								proposer: who.clone(),
 								destination: destination_para,
 							});
@@ -771,11 +912,15 @@ pub mod pallet {
 				// We get there, because collection owner is the same as NFT owners
 				let mut collection_metadata = None;
 
-				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(&origin_collection) {
+				if pallet_uniques::CollectionMetadataOf::<T, I>::contains_key(
+					&origin_collection.clone(),
+				) {
 					collection_metadata = Some(
-						pallet_nfts::CollectionMetadataOf::<T, I>::get(origin_collection)
-							.unwrap()
-							.data,
+						pallet_uniques::CollectionMetadataOf::<T, I>::get(
+							origin_collection.clone(),
+						)
+						.unwrap()
+						.data,
 					);
 				}
 
@@ -786,14 +931,16 @@ pub mod pallet {
 				// Get NFT configs
 				let mut nft_metadata = Vec::new();
 				for item_id in items.clone() {
-					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(
-						&origin_collection,
+					if pallet_uniques::ItemMetadataOf::<T, I>::contains_key(
+						&origin_collection.clone(),
 						item_id,
 					) {
-						let item_details =
-							pallet_nfts::ItemMetadataOf::<T, I>::get(origin_collection, item_id)
-								.unwrap()
-								.data;
+						let item_details = pallet_uniques::ItemMetadataOf::<T, I>::get(
+							origin_collection.clone(),
+							item_id,
+						)
+						.unwrap()
+						.data;
 						nft_metadata.push((item_id, item_details));
 					} else {
 						// Add empty metadata
@@ -820,7 +967,7 @@ pub mod pallet {
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata,
-									dest_collection_id: destination_collection.clone(),
+									dest_collection_id: dest_collection_id.clone(),
 									config,
 								},
 							)
@@ -831,32 +978,34 @@ pub mod pallet {
 				) {
 					Ok((_hash, _cost)) => {
 						// If collection was received, remove from received collections
-						if ReceivedCollections::<T, I>::contains_key(&origin_collection) {
-							ReceivedCollections::<T, I>::remove(&origin_collection);
+						if ReceivedCollections::<T, I>::contains_key(&origin_collection.clone()) {
+							ReceivedCollections::<T, I>::remove(&origin_collection.clone());
 						}
 
 						// Burning the NFTs
 						for item_id in items.clone() {
-							let _ = pallet_nfts::Pallet::<T, I>::burn(
+							let _ = pallet_uniques::Pallet::<T, I>::burn(
 								origin.clone(),
 								origin_collection.clone(),
 								item_id,
+								None,
 							);
 						}
 
 						// Get collection from the storage
 						let collection =
-							pallet_nfts::Collection::<T, I>::get(origin_collection).unwrap();
+							pallet_uniques::Collection::<T, I>::get(origin_collection.clone())
+								.unwrap();
 
 						// Create destroy witness type
 						let destroy_witness = DestroyWitness {
+							items: collection.clone().items,
 							item_metadatas: collection.clone().item_metadatas,
-							item_configs: collection.clone().item_configs,
 							attributes: collection.attributes,
 						};
 
 						// Burning the collection
-						let _ = pallet_nfts::Pallet::<T, I>::destroy(
+						let _ = pallet_uniques::Pallet::<T, I>::destroy(
 							origin.clone(),
 							origin_collection.clone(),
 							destroy_witness,
@@ -1022,7 +1171,7 @@ pub mod pallet {
 			let proposal = CrossChainProposals::<T, I>::get(proposal_id).unwrap();
 
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::collection_owner(proposal.collection_id.clone())
+				pallet_uniques::Pallet::<T, I>::collection_owner(proposal.collection_id.clone())
 					.ok_or(Error::<T, I>::CollectionDoesNotExist)? ==
 					who.clone(),
 				Error::<T, I>::NotCollectionOwner
@@ -1053,11 +1202,11 @@ pub mod pallet {
 				// Get the collection metadata
 				let mut collection_metadata = Some(BoundedVec::new());
 
-				if pallet_nfts::CollectionMetadataOf::<T, I>::contains_key(
+				if pallet_uniques::CollectionMetadataOf::<T, I>::contains_key(
 					proposal.collection_id.clone(),
 				) {
 					collection_metadata = Some(
-						pallet_nfts::CollectionMetadataOf::<T, I>::get(
+						pallet_uniques::CollectionMetadataOf::<T, I>::get(
 							proposal.collection_id.clone(),
 						)
 						.unwrap()
@@ -1070,7 +1219,7 @@ pub mod pallet {
 				let mut items = Vec::new();
 
 				for (item_id, _item_details) in
-					pallet_nfts::Item::<T, I>::iter_prefix(proposal.collection_id.clone())
+					pallet_uniques::Item::<T, I>::iter_prefix(proposal.collection_id.clone())
 				{
 					items.push(item_id);
 				}
@@ -1083,24 +1232,26 @@ pub mod pallet {
 					// in the collection
 					Self::collection_x_transfer(
 						origin.clone(),
-						proposal.collection_id,
-						proposal.proposed_dest_collection_id,
-						proposal.proposed_destination_para,
+						proposal.collection_id.clone(),
+						proposal.proposed_dest_collection_id.clone(),
+						proposal.proposed_destination_para.clone(),
 						proposal.proposed_destination_config.clone(),
 					)?;
 				}
 
 				for item_id in items.clone() {
-					let nft_owner =
-						pallet_nfts::Pallet::<T, I>::owner(proposal.collection_id.clone(), item_id)
-							.unwrap();
+					let nft_owner = pallet_uniques::Pallet::<T, I>::owner(
+						proposal.collection_id.clone(),
+						item_id,
+					)
+					.unwrap();
 					let unlooked_recipient = T::Lookup::unlookup(nft_owner.clone());
 
-					if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(
+					if pallet_uniques::ItemMetadataOf::<T, I>::contains_key(
 						proposal.collection_id.clone(),
 						item_id,
 					) {
-						let item_details = pallet_nfts::ItemMetadataOf::<T, I>::get(
+						let item_details = pallet_uniques::ItemMetadataOf::<T, I>::get(
 							proposal.collection_id.clone(),
 							item_id,
 						)
@@ -1115,7 +1266,6 @@ pub mod pallet {
 
 				let destination = proposal.proposed_destination_para.clone();
 				let unlooked_col_recipient = T::Lookup::unlookup(who.clone());
-				let config = proposal.proposed_destination_config.clone();
 
 				// Convert accountId into accountid32
 				let account_vec = who.encode();
@@ -1137,8 +1287,8 @@ pub mod pallet {
 							require_weight_at_most: Weight::from_parts(1_000_000_000, 64 * 1024),
 							call: <T as Config<I>>::RuntimeCall::from(
 								Call::<T, I>::parse_collection_diff_owners {
-									config,
 									origin_collection_id: proposal.collection_id.clone(),
+									config: proposal.proposed_destination_config.clone(),
 									origin_para: parachain_info::Pallet::<T>::parachain_id(),
 									collection_metadata: collection_metadata.unwrap(),
 									nfts: nft_metadata.clone(),
@@ -1162,7 +1312,7 @@ pub mod pallet {
 						// Burning the NFTs
 						for item_id in items.clone() {
 							//Get NFT owner
-							let nft_owner = pallet_nfts::Pallet::<T, I>::owner(
+							let nft_owner = pallet_uniques::Pallet::<T, I>::owner(
 								proposal.collection_id.clone(),
 								item_id,
 							)
@@ -1171,25 +1321,27 @@ pub mod pallet {
 								frame_system::RawOrigin::Signed(nft_owner.clone()).into();
 
 							//Burn the NFT
-							let _ = pallet_nfts::Pallet::<T, I>::burn(
+							let _ = pallet_uniques::Pallet::<T, I>::burn(
 								signed_nft_owner,
 								proposal.collection_id.clone(),
 								item_id,
+								None,
 							);
 						}
 
 						//Burning the collection
 						let collection =
-							pallet_nfts::Collection::<T, I>::get(proposal.collection_id.clone())
+							pallet_uniques::Collection::<T, I>::get(proposal.collection_id.clone())
 								.unwrap();
 
+						// Create destroy witness type
 						let destroy_witness = DestroyWitness {
+							items: collection.clone().items,
 							item_metadatas: collection.clone().item_metadatas,
-							item_configs: collection.clone().item_configs,
 							attributes: collection.attributes,
 						};
 
-						let _ = pallet_nfts::Pallet::<T, I>::destroy(
+						let _ = pallet_uniques::Pallet::<T, I>::destroy(
 							origin.clone(),
 							proposal.collection_id.clone(),
 							destroy_witness,
@@ -1246,20 +1398,23 @@ pub mod pallet {
 
 			// See if collection exists
 			ensure!(
-				pallet_nfts::Collection::<T, I>::contains_key(&origin_collection),
+				pallet_uniques::Collection::<T, I>::contains_key(&origin_collection),
 				Error::<T, I>::CollectionDoesNotExist
 			);
 
 			// See if item exists
 			ensure!(
-				pallet_nfts::Item::<T, I>::contains_key(&origin_collection, &origin_asset),
+				pallet_uniques::Item::<T, I>::contains_key(&origin_collection, &origin_asset),
 				Error::<T, I>::NFTDoesNotExist
 			);
 
 			// See if user owns the item
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::owner(origin_collection.clone(), origin_asset.clone())
-					.ok_or(Error::<T, I>::NFTDoesNotExist)? ==
+				pallet_uniques::Pallet::<T, I>::owner(
+					origin_collection.clone(),
+					origin_asset.clone()
+				)
+				.ok_or(Error::<T, I>::NFTDoesNotExist)? ==
 					who.clone(),
 				Error::<T, I>::NotNFTOwner
 			);
@@ -1267,9 +1422,11 @@ pub mod pallet {
 			// Get Item data
 			let mut metadata = Some(BoundedVec::new());
 
-			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(&origin_collection, &origin_asset)
-			{
-				metadata = pallet_nfts::ItemMetadataOf::<T, I>::get(
+			if pallet_uniques::ItemMetadataOf::<T, I>::contains_key(
+				&origin_collection,
+				&origin_asset,
+			) {
+				metadata = pallet_uniques::ItemMetadataOf::<T, I>::get(
 					origin_collection.clone(),
 					origin_asset.clone(),
 				)
@@ -1339,22 +1496,23 @@ pub mod pallet {
 						));
 
 						// Burn the asset
-						let _ = pallet_nfts::Pallet::<T, I>::burn(
+						let _ = pallet_uniques::Pallet::<T, I>::burn(
 							origin.clone(),
 							origin_collection.clone(),
 							origin_asset.clone(),
+							None,
 						);
 					}
 					//Only remove asset metadata, because we are sending from origin chain
 					else {
-						let col_owner = pallet_nfts::Pallet::<T, I>::collection_owner(
+						let col_owner = pallet_uniques::Pallet::<T, I>::collection_owner(
 							origin_collection.clone(),
 						)
 						.unwrap();
 						let signed_col: OriginFor<T> =
 							frame_system::RawOrigin::Signed(col_owner.clone()).into();
 
-						let _ = pallet_nfts::Pallet::<T, I>::clear_metadata(
+						let _ = pallet_uniques::Pallet::<T, I>::clear_metadata(
 							signed_col.clone(),
 							origin_collection.clone(),
 							origin_asset.clone(),
@@ -1423,13 +1581,13 @@ pub mod pallet {
 
 			// See if collection exists
 			ensure!(
-				pallet_nfts::Collection::<T, I>::contains_key(&current_collection),
+				pallet_uniques::Collection::<T, I>::contains_key(&current_collection),
 				Error::<T, I>::CollectionDoesNotExist
 			);
 
 			// See if origin collection exists
 			ensure!(
-				pallet_nfts::Collection::<T, I>::contains_key(&origin_collection_at_destination),
+				pallet_uniques::Collection::<T, I>::contains_key(&origin_collection_at_destination),
 				Error::<T, I>::CollectionDoesNotExist
 			);
 
@@ -1453,7 +1611,7 @@ pub mod pallet {
 
 			// See if item in origin collection exists
 			ensure!(
-				pallet_nfts::Item::<T, I>::contains_key(
+				pallet_uniques::Item::<T, I>::contains_key(
 					&origin_collection_at_destination,
 					&origin_asset_at_destination
 				),
@@ -1462,7 +1620,7 @@ pub mod pallet {
 
 			// See if user owns the item
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::owner(
+				pallet_uniques::Pallet::<T, I>::owner(
 					origin_collection_at_destination.clone(),
 					origin_asset_at_destination.clone()
 				)
@@ -1473,7 +1631,7 @@ pub mod pallet {
 
 			// See if user owns the current asset
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::owner(
+				pallet_uniques::Pallet::<T, I>::owner(
 					current_collection.clone(),
 					current_asset.clone()
 				)
@@ -1485,11 +1643,11 @@ pub mod pallet {
 			// Claim the asset
 			let mut metadata = Some(BoundedVec::new());
 
-			if pallet_nfts::ItemMetadataOf::<T, I>::contains_key(
+			if pallet_uniques::ItemMetadataOf::<T, I>::contains_key(
 				current_collection.clone(),
 				current_asset.clone(),
 			) {
-				metadata = pallet_nfts::ItemMetadataOf::<T, I>::get(
+				metadata = pallet_uniques::ItemMetadataOf::<T, I>::get(
 					current_collection.clone(),
 					current_asset.clone(),
 				)
@@ -1497,19 +1655,21 @@ pub mod pallet {
 			}
 
 			// Burn the current asset
-			let _ = pallet_nfts::Pallet::<T, I>::burn(
+			let _ = pallet_uniques::Pallet::<T, I>::burn(
 				origin.clone(),
 				current_collection.clone(),
 				current_asset.clone(),
+				None,
 			);
 
 			// Add the metadata to the old asset location
 			if metadata.is_some() {
-				let _ = pallet_nfts::Pallet::<T, I>::set_metadata(
+				let _ = pallet_uniques::Pallet::<T, I>::set_metadata(
 					origin.clone(),
 					origin_collection_at_destination.clone(),
 					origin_asset_at_destination.clone(),
 					metadata.unwrap(),
+					false,
 				);
 			}
 
@@ -1964,84 +2124,75 @@ pub mod pallet {
 		pub fn parse_collection_empty(
 			origin: OriginFor<T>,
 			origin_collection: T::CollectionId,
-			_destination_collection: Option<T::CollectionId>,
+			destination_collection: Option<T::CollectionId>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
-			config: Option<CollectionConfigFor<T, I>>,
+			_config: Option<CollectionConfigFor<T, I>>,
 		) -> DispatchResultWithPostInfo {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			//Get next collection id
-			let mut next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-				.or(T::CollectionId::initial_value())
-				.unwrap();
+			// Check if destination collection is provided
+			let mut destination_collection = match destination_collection {
+				Some(c) => c,
+				None => origin_collection.clone(),
+			};
 
-			// Check if config is present
-			if config.is_none() {
-				// Create default configfor collection
-				let def_config = CollectionConfigFor::<T, I> {
-					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None,                            /* No maximum supply defined
-					                                              * initially */
-					mint_settings: MintSettings::default(), // Use default mint settings
-				};
-
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					def_config.clone(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
-			} else {
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					config.clone().unwrap(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&destination_collection) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection) {
+						true => {
+							// Future work - CollectionId is not incrementable in pallet_uniques
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as
+							// u32); 	if !pallet_uniques::Collection::<T,
+							// I>::contains_key(&new_collection) { 		destination_collection =
+							// new_collection; 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => {
+							destination_collection = origin_collection.clone();
+						},
+					}
+				},
+				false => {},
 			}
 
-			let mut user_collection = next_collection_id.clone();
-
-			// just to be sure, check if user is collection owner
-			if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id.clone()).unwrap() !=
-				signed_origin.clone()
-			{
-				//Get current next_collection_id
-				let current_next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-					.ok_or(Error::<T, I>::NoNextCollectionId)?;
-
-				// Go from next_collection_id to current_next_collection_id and try to find the
-				// collection that is owned by the user
-				while next_collection_id != current_next_collection_id {
-					if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id).unwrap() ==
-						signed_origin.clone()
-					{
-						// We have users collection
-						user_collection = next_collection_id.clone();
-						break;
-					}
-					next_collection_id =
-						next_collection_id.increment().ok_or(Error::<T, I>::NoNextCollectionId)?;
-				}
+			// Create the collection
+			match pallet_uniques::Pallet::<T, I>::create(
+				origin.clone(),
+				destination_collection.clone(),
+				signed_origin_lookup.clone(),
+			) {
+				Ok(_) => {},
+				Err(e) => {
+					// Deposit event indicating failure to create collection
+					Self::deposit_event(Event::CollectionCreationFailed {
+						owner: signed_origin_lookup.clone(),
+						error: e,
+					});
+				},
 			}
 
 			// Set the collection metadata if not empty
 			if !collection_metadata.is_empty() {
-				match pallet_nfts::Pallet::<T, I>::set_collection_metadata(
+				match pallet_uniques::Pallet::<T, I>::set_collection_metadata(
 					origin.clone(),
-					user_collection.clone(),
+					origin_collection.clone(),
 					collection_metadata.clone(),
+					false,
 				) {
 					Ok(_) => {},
 					Err(e) => {
@@ -2081,12 +2232,12 @@ pub mod pallet {
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
 			let destroy_witness = DestroyWitness {
+				items: witness_data.item_configs.clone(),
 				item_metadatas: witness_data.item_meta.clone(),
-				item_configs: witness_data.item_configs.clone(),
 				attributes: witness_data.attributes.clone(),
 			};
 
-			match pallet_nfts::Pallet::<T, I>::destroy(
+			match pallet_uniques::Pallet::<T, I>::destroy(
 				origin.clone(),
 				collection_to_burn.clone(),
 				destroy_witness.clone(),
@@ -2120,10 +2271,11 @@ pub mod pallet {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			match pallet_nfts::Pallet::<T, I>::set_collection_metadata(
+			match pallet_uniques::Pallet::<T, I>::set_collection_metadata(
 				origin.clone(),
 				collection.clone(),
 				data.clone(),
+				false,
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2153,7 +2305,7 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_signed(origin.clone())?;
 
-			match pallet_nfts::Pallet::<T, I>::transfer_ownership(
+			match pallet_uniques::Pallet::<T, I>::transfer_ownership(
 				origin.clone(),
 				collection.clone(),
 				new_owner.clone(),
@@ -2187,10 +2339,11 @@ pub mod pallet {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			match pallet_nfts::Pallet::<T, I>::burn(
+			match pallet_uniques::Pallet::<T, I>::burn(
 				origin.clone(),
 				collection.clone(),
 				item.clone(),
+				None,
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2223,11 +2376,12 @@ pub mod pallet {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			match pallet_nfts::Pallet::<T, I>::set_metadata(
+			match pallet_uniques::Pallet::<T, I>::set_metadata(
 				origin.clone(),
 				collection.clone(),
 				item.clone(),
 				data.clone(),
+				false,
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2260,7 +2414,7 @@ pub mod pallet {
 			let signed_origin = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(signed_origin.clone());
 
-			match pallet_nfts::Pallet::<T, I>::transfer(
+			match pallet_uniques::Pallet::<T, I>::transfer(
 				origin.clone(),
 				collection.clone(),
 				item.clone(),
@@ -2302,7 +2456,7 @@ pub mod pallet {
 
 			// Check if the collection exists
 			ensure!(
-				pallet_nfts::Collection::<T, I>::contains_key(&collection),
+				pallet_uniques::Collection::<T, I>::contains_key(&collection),
 				Error::<T, I>::CollectionDoesNotExist
 			);
 
@@ -2315,7 +2469,7 @@ pub mod pallet {
 			if SentAssets::<T, I>::contains_key(&(collection.clone(), item.clone())) {
 				// User returns nft to origin collection, use collection owner to add metadata
 				let col_owner =
-					pallet_nfts::Pallet::<T, I>::collection_owner(collection.clone()).unwrap();
+					pallet_uniques::Pallet::<T, I>::collection_owner(collection.clone()).unwrap();
 				let signed_col: OriginFor<T> =
 					frame_system::RawOrigin::Signed(col_owner.clone()).into();
 				let sent_asset =
@@ -2324,11 +2478,12 @@ pub mod pallet {
 				if sent_asset.origin_para_id == parachain_info::Pallet::<T>::parachain_id() {
 					// We know we are the origin chain, we can add only metadata
 					if !data.is_empty() {
-						match pallet_nfts::Pallet::<T, I>::set_metadata(
+						match pallet_uniques::Pallet::<T, I>::set_metadata(
 							signed_col.clone(),
 							collection.clone(),
 							item.clone(),
 							data.clone(),
+							false,
 						) {
 							Ok(_) => {},
 							Err(e) => {
@@ -2363,23 +2518,22 @@ pub mod pallet {
 
 			// Check if the owner owns the collection
 			ensure!(
-				pallet_nfts::Pallet::<T, I>::collection_owner(collection.clone()).unwrap() ==
+				pallet_uniques::Pallet::<T, I>::collection_owner(collection.clone()).unwrap() ==
 					signed_origin.clone(),
 				Error::<T, I>::NotCollectionOwner
 			);
 
 			// Check if the item exists
 			ensure!(
-				!pallet_nfts::Item::<T, I>::contains_key(&collection.clone(), &item),
+				!pallet_uniques::Item::<T, I>::contains_key(collection.clone(), &item),
 				Error::<T, I>::NFTExists
 			);
 
-			match pallet_nfts::Pallet::<T, I>::mint(
+			match pallet_uniques::Pallet::<T, I>::mint(
 				origin.clone(),
 				collection.clone(),
 				item.clone(),
 				signed_origin_lookup.clone(),
-				None,
 			) {
 				Ok(_) => {},
 				Err(e) => {
@@ -2394,11 +2548,12 @@ pub mod pallet {
 			}
 
 			if !data.is_empty() {
-				match pallet_nfts::Pallet::<T, I>::set_metadata(
+				match pallet_uniques::Pallet::<T, I>::set_metadata(
 					origin.clone(),
 					collection.clone(),
 					item.clone(),
 					data.clone(),
+					false,
 				) {
 					Ok(_) => {},
 					Err(e) => {
@@ -2415,7 +2570,7 @@ pub mod pallet {
 
 			// Check if the NFT was minted successfuly
 			ensure!(
-				pallet_nfts::Item::<T, I>::contains_key(&collection, &item),
+				pallet_uniques::Item::<T, I>::contains_key(&collection, &item),
 				Error::<T, I>::NFTDoesNotExist
 			);
 
@@ -2454,93 +2609,79 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_same_owner(
 			origin: OriginFor<T>,
-			config: Option<CollectionConfigFor<T, I>>,
+			_config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
 			origin_collection_id: T::CollectionId,
-			_dest_collection_id: Option<T::CollectionId>,
+			dest_collection_id: Option<T::CollectionId>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
 
-			// Get next collection id
-			let mut next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-				.or(T::CollectionId::initial_value())
-				.unwrap();
+			let mut col_id = match dest_collection_id.clone() {
+				Some(c) => c,
+				None => origin_collection_id.clone(),
+			};
 
-			// Check if config is present
-			if config.is_none() {
-				// Create default configfor collection
-				let def_config = CollectionConfigFor::<T, I> {
-					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None,                            /* No maximum supply defined
-					                                              * initially */
-					mint_settings: MintSettings::default(), // Use default mint settings
-				};
-
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					def_config.clone(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
-			} else {
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					config.clone().unwrap(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&col_id) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection_id) {
+						true => {
+							// Future work - CollectionId is not incrementable in pallet_uniques
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as
+							// u32); 	if !pallet_uniques::Collection::<T,
+							// I>::contains_key(&new_collection) { 		destination_collection =
+							// new_collection; 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => {
+							col_id = origin_collection_id.clone();
+						},
+					}
+				},
+				false => {},
 			}
 
-			let mut user_collection = next_collection_id.clone();
-
-			// just to be sure, check if user is collection owner
-			if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id.clone()).unwrap() !=
-				who.clone()
-			{
-				//Get current next_collection_id
-				let current_next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-					.ok_or(Error::<T, I>::NoNextCollectionId)?;
-
-				// Go from next_collection_id to current_next_collection_id and try to find the
-				// collection that is owned by the user
-				while next_collection_id != current_next_collection_id {
-					if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id).unwrap() ==
-						who.clone()
-					{
-						// We have users collection
-						user_collection = next_collection_id.clone();
-						break;
-					}
-					next_collection_id =
-						next_collection_id.increment().ok_or(Error::<T, I>::NoNextCollectionId)?;
-				}
+			match pallet_uniques::Pallet::<T, I>::create(
+				origin.clone(),
+				col_id.clone(),
+				signed_origin_lookup.clone(),
+			) {
+				Ok(_) => {},
+				Err(e) => {
+					//  Deposit event indicating failure to create collection
+					Self::deposit_event(Event::CollectionMintFailed { error: e });
+				},
 			}
 
 			// Set the collection metadata if present
 			if !collection_metadata.is_empty() {
-				match pallet_nfts::Pallet::<T, I>::set_collection_metadata(
+				match pallet_uniques::Pallet::<T, I>::set_collection_metadata(
 					origin.clone(),
-					user_collection.clone(),
+					col_id.clone(),
 					collection_metadata.clone(),
+					false,
 				) {
 					Ok(_) => {},
 					Err(e) => {
 						// Deposit event indicating failure to set metadata
 						Self::deposit_event(Event::CollectionMetadataSetFailed {
-							collection_id: user_collection.clone(),
+							collection_id: col_id.clone(),
 							owner: signed_origin_lookup.clone(),
 							error: e,
 						});
@@ -2553,18 +2694,17 @@ pub mod pallet {
 				let item = nft.0;
 				let data = nft.1;
 
-				match pallet_nfts::Pallet::<T, I>::mint(
+				match pallet_uniques::Pallet::<T, I>::mint(
 					origin.clone(),
-					user_collection.clone(),
+					col_id.clone(),
 					item.clone(),
 					signed_origin_lookup.clone(),
-					None,
 				) {
 					Ok(_) => {},
 					Err(e) => {
 						// Deposit event indicating failure to mint NFT
 						Self::deposit_event(Event::NFTMintFailed {
-							collection_id: user_collection.clone(),
+							collection_id: col_id.clone(),
 							asset_id: item.clone(),
 							owner: signed_origin_lookup.clone(),
 							error: e,
@@ -2573,17 +2713,18 @@ pub mod pallet {
 				}
 				//If empty metadata, skip
 				if !data.is_empty() {
-					match pallet_nfts::Pallet::<T, I>::set_metadata(
+					match pallet_uniques::Pallet::<T, I>::set_metadata(
 						origin.clone(),
-						user_collection.clone(),
+						col_id.clone(),
 						item.clone(),
 						data.clone(),
+						false,
 					) {
 						Ok(_) => {},
 						Err(e) => {
 							// Deposit event indicating failure to set metadata
 							Self::deposit_event(Event::NFTMetadataSetFailed {
-								collection_id: user_collection.clone(),
+								collection_id: col_id.clone(),
 								asset_id: item.clone(),
 								owner: signed_origin_lookup.clone(),
 								error: e,
@@ -2594,24 +2735,24 @@ pub mod pallet {
 
 				// Check if the NFT was minted if storage contains the item
 				ensure!(
-					pallet_nfts::Item::<T, I>::contains_key(&user_collection, &item),
+					pallet_uniques::Item::<T, I>::contains_key(&col_id, &item),
 					Error::<T, I>::NFTDoesNotExist
 				);
 			}
 
 			// Add collection to received collections
 			ReceivedCollections::<T, I>::insert(
-				user_collection.clone(),
+				col_id.clone(),
 				ReceivedCols {
 					origin_para_id: origin_para.clone(),
 					origin_collection_id: origin_collection_id.clone(),
-					received_collection_id: user_collection.clone(),
+					received_collection_id: col_id.clone(),
 				},
 			);
 
 			// Emit event about successful cross-chain operation
 			Self::deposit_event(Event::CollectionWithNftsReceived {
-				collection_id: user_collection.clone(),
+				collection_id: col_id.clone(),
 				items: nfts.clone(),
 			});
 
@@ -2629,93 +2770,79 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn parse_collection_diff_owners(
 			origin: OriginFor<T>,
-			config: Option<CollectionConfigFor<T, I>>,
+			_config: Option<CollectionConfigFor<T, I>>,
 			collection_metadata: BoundedVec<u8, T::StringLimit>,
 			nfts: Vec<(T::ItemId, AccountIdLookupOf<T>, BoundedVec<u8, T::StringLimit>)>,
 			origin_para: ParaId,
 			origin_collection_id: T::CollectionId,
-			_dest_collection_id: Option<T::CollectionId>,
+			dest_collection_id: Option<T::CollectionId>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin.clone())?;
 			let signed_origin_lookup = T::Lookup::unlookup(who.clone());
 
-			//Get next collection id
-			let mut next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-				.or(T::CollectionId::initial_value())
-				.unwrap();
+			let mut col_id = match dest_collection_id.clone() {
+				Some(c) => c,
+				None => origin_collection_id.clone(),
+			};
 
-			// Check if config is present
-			if config.is_none() {
-				// Create default configfor collection
-				let def_config = CollectionConfigFor::<T, I> {
-					settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-					max_supply: None,                            /* No maximum supply defined
-					                                              * initially */
-					mint_settings: MintSettings::default(), // Use default mint settings
-				};
-
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					def_config.clone(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
-			} else {
-				match pallet_nfts::Pallet::<T, I>::create(
-					origin.clone(),
-					signed_origin_lookup.clone(),
-					config.clone().unwrap(),
-				) {
-					Ok(_) => {},
-					Err(e) => {
-						//  Deposit event indicating failure to create collection
-						Self::deposit_event(Event::CollectionMintFailed { error: e });
-					},
-				}
+			// Check if collection exists
+			match pallet_uniques::Collection::<T, I>::contains_key(&col_id) {
+				true => {
+					// Try with origin collection id, maybe that is empty
+					match pallet_uniques::Collection::<T, I>::contains_key(&origin_collection_id) {
+						true => {
+							// Future work - CollectionId is not incrementable in pallet_uniques
+							// Use for cycle to find empty collection
+							// let mut i = 0;
+							// loop {
+							// 	let new_collection: T::CollectionId = T::CollectionId::from(i as
+							// u32); 	if !pallet_uniques::Collection::<T,
+							// I>::contains_key(&new_collection) { 		destination_collection =
+							// new_collection; 		break;
+							// 	}
+							// 	if i == u32::MAX {
+							// 		// Deposit event indicating failure to create collection
+							// 		Self::deposit_event(Event::CollectionListFull {
+							// 			owner: signed_origin_lookup.clone(),
+							// 		});
+							// 		return Ok(().into());
+							//	}
+							//	i += 1;
+							//}
+						},
+						false => {
+							col_id = origin_collection_id.clone();
+						},
+					}
+				},
+				false => {},
 			}
 
-			let mut user_collection = next_collection_id.clone();
-
-			// just to be sure, check if user is collection owner
-			if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id.clone()).unwrap() !=
-				who.clone()
-			{
-				//Get current next_collection_id
-				let current_next_collection_id = pallet_nfts::NextCollectionId::<T, I>::get()
-					.ok_or(Error::<T, I>::NoNextCollectionId)?;
-
-				// Go from next_collection_id to current_next_collection_id and try to find the
-				// collection that is owned by the user
-				while next_collection_id != current_next_collection_id {
-					if pallet_nfts::Pallet::<T, I>::collection_owner(next_collection_id).unwrap() ==
-						who.clone()
-					{
-						// We have users collection
-						user_collection = next_collection_id.clone();
-						break;
-					}
-					next_collection_id =
-						next_collection_id.increment().ok_or(Error::<T, I>::NoNextCollectionId)?;
-				}
+			match pallet_uniques::Pallet::<T, I>::create(
+				origin.clone(),
+				col_id.clone(),
+				signed_origin_lookup.clone(),
+			) {
+				Ok(_) => {},
+				Err(e) => {
+					//  Deposit event indicating failure to create collection
+					Self::deposit_event(Event::CollectionMintFailed { error: e });
+				},
 			}
 
 			// Set the collection metadata if present
 			if !collection_metadata.is_empty() {
-				match pallet_nfts::Pallet::<T, I>::set_collection_metadata(
+				match pallet_uniques::Pallet::<T, I>::set_collection_metadata(
 					origin.clone(),
-					user_collection.clone(),
+					col_id.clone(),
 					collection_metadata.clone(),
+					false,
 				) {
 					Ok(_) => {},
 					Err(e) => {
 						// Deposit event indicating failure to set metadata
 						Self::deposit_event(Event::CollectionMetadataSetFailed {
-							collection_id: user_collection.clone(),
+							collection_id: col_id.clone(),
 							owner: signed_origin_lookup.clone(),
 							error: e,
 						});
@@ -2729,18 +2856,17 @@ pub mod pallet {
 				let nft_owner = nft.1;
 				let data = nft.2;
 
-				match pallet_nfts::Pallet::<T, I>::mint(
+				match pallet_uniques::Pallet::<T, I>::mint(
 					origin.clone(),
-					user_collection.clone(),
+					col_id.clone(),
 					item.clone(),
 					nft_owner.clone(),
-					None,
 				) {
 					Ok(_) => {},
 					Err(e) => {
 						// Deposit event indicating failure to mint NFT
 						Self::deposit_event(Event::NFTMintFailed {
-							collection_id: user_collection.clone(),
+							collection_id: col_id.clone(),
 							asset_id: item.clone(),
 							owner: nft_owner.clone(),
 							error: e,
@@ -2749,17 +2875,18 @@ pub mod pallet {
 				}
 
 				if !data.is_empty() {
-					match pallet_nfts::Pallet::<T, I>::set_metadata(
+					match pallet_uniques::Pallet::<T, I>::set_metadata(
 						origin.clone(),
-						user_collection.clone(),
+						col_id.clone(),
 						item.clone(),
 						data.clone(),
+						false,
 					) {
 						Ok(_) => {},
 						Err(e) => {
 							// Deposit event indicating failure to set metadata
 							Self::deposit_event(Event::NFTMetadataSetFailed {
-								collection_id: user_collection.clone(),
+								collection_id: col_id.clone(),
 								asset_id: item.clone(),
 								owner: nft_owner.clone(),
 								error: e,
@@ -2770,24 +2897,24 @@ pub mod pallet {
 
 				//Check if the NFT was minted if storage contains the item
 				ensure!(
-					pallet_nfts::Item::<T, I>::contains_key(&user_collection, &item),
+					pallet_uniques::Item::<T, I>::contains_key(&col_id, &item),
 					Error::<T, I>::NFTDoesNotExist
 				);
 			}
 
 			//Add collection to received collections
 			ReceivedCollections::<T, I>::insert(
-				user_collection.clone(),
+				col_id.clone(),
 				ReceivedCols {
 					origin_para_id: origin_para.clone(),
 					origin_collection_id: origin_collection_id.clone(),
-					received_collection_id: user_collection.clone(),
+					received_collection_id: col_id.clone(),
 				},
 			);
 
 			//If all went up to this point, emit event about successful cross-chain operation
 			Self::deposit_event(Event::CollectionWithNftsDiffOwnersReceived {
-				collection_id: user_collection.clone(),
+				collection_id: col_id.clone(),
 				items: nfts.clone(),
 			});
 
