@@ -1,4 +1,4 @@
-//! # xcNFT Pallet by ParaSpell✨ Foundation team
+//! # xcNFT Pallet by ParaSpell✨ Research team
 //!
 //! Pallet is made under [MIT](https://github.com/paraspell-research-foundation/xcNFT-Pallet/blob/main/LICENSE) license and is thereby free to use, modify, and distribute.
 //!

@@ -1,6 +1,6 @@
 [package]
 name = "pallet-parachain-xcnft-two"
-authors = ["ParaSpell Foundation"]
+authors = ["ParaSpell Research"]
 description = "Pallet for NFT sharing using XCM."
 version = "0.1.0"
 license = "MIT"
