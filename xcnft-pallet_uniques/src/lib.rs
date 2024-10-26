@@ -50,7 +50,6 @@
 //! - `sp-io`
 //!
 //! Substrate Pallets:
-//! - `pallet-nfts`
 //! - `pallet-uniques`
 //! - `pallet-balances`
 //! - `parachain-info`
