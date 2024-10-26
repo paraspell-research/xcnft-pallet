@@ -55,7 +55,7 @@
 //! - `parachain-info`
 //! 
 //! Other pallets:
-//! - `enumflags2``
+//! - `enumflags2`
 //! 
 #![cfg_attr(not(feature = "std"), no_std)]
 
