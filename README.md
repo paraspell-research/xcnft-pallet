@@ -1,4 +1,4 @@
-# Welcome fellow Parachain developer 🧙‍♂️ meet xcNFT
+# Welcome fellow Parachain developer 🧙‍♂️ - meet xcNFT
 
 Following section will guide you through implementation of the xcNFT cross-chain pallet for non-fungible assets.
 
