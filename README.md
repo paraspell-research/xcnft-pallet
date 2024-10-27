@@ -2,6 +2,8 @@
 
 Following section will guide you through implementation of the xcNFT cross-chain pallet for non-fungible assets.
 
+Pallet docs - [[link]](https://paraspell-research.github.io/xcnft-docs/)
+
 ## Before your journey begins 🧳
 
 Before you begin with implementing this magical ✨ pallet into your Parachain, you must ensure, that you meet following pre-requirements:
