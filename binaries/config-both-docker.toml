@@ -1,0 +1,44 @@
+[relaychain]
+
+default_command = "../target/release/polkadot"
+default_args = [ "-lparachain=debug" ]
+
+chain = "rococo-local"
+
+  [[relaychain.nodes]]
+  name = "alice"
+  rpc_port = 9910
+
+  [[relaychain.nodes]]
+  name = "bob"
+  rpc_port = 9911
+
+  [[relaychain.nodes]]
+  name = "charlie"
+  rpc_port = 9912
+
+  [[relaychain.nodes]]
+  name = "dave"
+  rpc_port = 9913
+
+[[parachains]]
+id = 1000
+
+  [parachains.collator]
+  name = "parachain-A-1000-collator01"
+  command = "../target/release/parachain-template-node"
+    args = [
+		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
+	]
+  rpc_port = 9920
+
+[[parachains]]
+id = 1001
+
+  [parachains.collator]
+  name = "parachain-A-1001-collator01"
+  command = "../target/release/parachain-template-node-two"
+  args = [
+		"-lparachain=debug,xcm::process-message=trace,xcm::execute=trace,xcm::process=trace"
+	]
+  rpc_port = 9921

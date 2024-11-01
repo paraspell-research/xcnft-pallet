@@ -48,11 +48,10 @@ WORKDIR /usr/src/app/polkadot-sdk/binaries
 # Download the latest zombienet image
 RUN wget https://github.com/paritytech/zombienet/releases/download/v1.3.116/zombienet-linux-x64 \
     && chmod +x zombienet-linux-x64
-    
-# Set environment variable for interface binding
-ENV BIND_INTERFACE=127.0.0.1
+
+ENV BIND_INTERFACE=0.0.0.0
 
 # Launch zombienet
-CMD ["./zombienet-linux-x64", "-p", "native", "-c", "1", "spawn", "config-both.toml"]
+CMD ["./zombienet-linux-x64", "-p", "native", "-c", "1", "spawn", "config-both-docker.toml"]
 
 
