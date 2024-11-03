@@ -18,6 +18,7 @@ codec = { features = [
 scale-info = { features = [
 	"derive",
 ], workspace = true }
+log = { workspace = true }
 
 
 # Substrate
@@ -27,6 +28,7 @@ frame-system = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
+xcm-builder = { workspace = true, default-features = false }
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
@@ -47,6 +49,9 @@ sp-io = { workspace = true, default-features = true }
 
 pallet-balances = { workspace = true, default-features = true }
 
+
+
+
 [features]
 default = [ "std" ]
 runtime-benchmarks = [
@@ -54,6 +59,10 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+	"xcm-builder/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"pallet-nfts/runtime-benchmarks",
 ]
 std = [
 	"codec/std",
@@ -63,10 +72,9 @@ std = [
 	"frame-system/std",
 	"pallet-nfts/std",
 	"sp-runtime/std",
-	"cumulus-pallet-xcm/std",
-	"cumulus-primitives-core/std",
 	"sp-std/std",
 	"xcm/std",
+	"xcm-builder/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",

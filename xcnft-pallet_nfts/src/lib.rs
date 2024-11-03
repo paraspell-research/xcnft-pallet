@@ -51,6 +51,7 @@
 //!
 //! Substrate Pallets:
 //! - `pallet-nfts`
+//! - `pallet-uniques`
 //! - `pallet-balances`
 //! - `parachain-info`
 
@@ -59,10 +60,9 @@
 pub use pallet::*;
 
 #[cfg(test)]
-mod mock;
-
+pub mod mock;
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 pub mod weights;
 
@@ -120,9 +120,9 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct GeneralizedDestroyWitness {
-		item_meta: u32,
-		item_configs: u32,
-		attributes: u32,
+		pub item_meta: u32,
+		pub item_configs: u32,
+		pub attributes: u32,
 	}
 
 	/// Enum for voting, either Aye or Nay option.
@@ -138,8 +138,8 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct Votes<T: Config<I>, I: 'static = ()> {
-		aye: BoundedVec<T::AccountId, T::MaxOwners>,
-		nay: BoundedVec<T::AccountId, T::MaxOwners>,
+		pub aye: BoundedVec<T::AccountId, T::MaxOwners>,
+		pub nay: BoundedVec<T::AccountId, T::MaxOwners>,
 	}
 
 	/// Structure of proposal, contains proposal id, collection id, proposed collection owner,
@@ -148,15 +148,15 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default, Debug)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct Proposal<T: Config<I>, I: 'static = ()> {
-		proposal_id: u64,
-		collection_id: T::CollectionId,
-		proposed_collection_owner: T::AccountId,
-		proposed_destination_para: ParaId,
-		proposed_dest_collection_id: Option<T::CollectionId>,
-		proposed_destination_config: Option<CollectionConfigFor<T, I>>,
-		owners: BoundedVec<T::AccountId, T::MaxOwners>,
-		number_of_votes: Votes<T, I>,
-		end_time: BlockNumberFor<T>,
+		pub proposal_id: u64,
+		pub collection_id: T::CollectionId,
+		pub proposed_collection_owner: T::AccountId,
+		pub proposed_destination_para: ParaId,
+		pub proposed_dest_collection_id: Option<T::CollectionId>,
+		pub proposed_destination_config: Option<CollectionConfigFor<T, I>>,
+		pub owners: BoundedVec<T::AccountId, T::MaxOwners>,
+		pub number_of_votes: Votes<T, I>,
+		pub end_time: BlockNumberFor<T>,
 	}
 
 	/// Structure of sent assets, contains origin parachain id, origin collection id, origin asset
@@ -164,11 +164,11 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct SentStruct<T: Config<I>, I: 'static = ()> {
-		origin_para_id: ParaId,
-		origin_collection_id: T::CollectionId,
-		origin_asset_id: T::ItemId,
-		destination_collection_id: T::CollectionId,
-		destination_asset_id: T::ItemId,
+		pub origin_para_id: ParaId,
+		pub origin_collection_id: T::CollectionId,
+		pub origin_asset_id: T::ItemId,
+		pub destination_collection_id: T::CollectionId,
+		pub destination_asset_id: T::ItemId,
 	}
 
 	/// Structure of received assets, contains origin parachain id, origin collection id, origin
@@ -176,11 +176,11 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct ReceivedStruct<T: Config<I>, I: 'static = ()> {
-		origin_para_id: ParaId,
-		origin_collection_id: T::CollectionId,
-		origin_asset_id: T::ItemId,
-		received_collection_id: T::CollectionId,
-		received_asset_id: T::ItemId,
+		pub origin_para_id: ParaId,
+		pub origin_collection_id: T::CollectionId,
+		pub origin_asset_id: T::ItemId,
+		pub received_collection_id: T::CollectionId,
+		pub received_asset_id: T::ItemId,
 	}
 
 	/// Structure of received collections, contains origin parachain id, origin collection id, and
@@ -188,9 +188,9 @@ pub mod pallet {
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, PartialEq, Default)]
 	#[scale_info(skip_type_params(T, I))]
 	pub struct ReceivedCols<T: Config<I>, I: 'static = ()> {
-		origin_para_id: ParaId,
-		origin_collection_id: T::CollectionId,
-		received_collection_id: T::CollectionId,
+		pub origin_para_id: ParaId,
+		pub origin_collection_id: T::CollectionId,
+		pub received_collection_id: T::CollectionId,
 	}
 
 	/// Storage for sent assets, contains origin collection id and origin asset id as tuple key and
@@ -921,7 +921,9 @@ pub mod pallet {
 				// storage and emit event.
 				if unwrapped_proposal.number_of_votes.aye.len() < number_of_votes / 2 ||
 					unwrapped_proposal.number_of_votes.aye.len() == 0 &&
-						unwrapped_proposal.number_of_votes.nay.len() == 0
+						unwrapped_proposal.number_of_votes.nay.len() == 0 ||
+					unwrapped_proposal.number_of_votes.aye.len() == 0 &&
+						unwrapped_proposal.number_of_votes.nay.len() == 1
 				{
 					CrossChainProposals::<T, I>::remove(proposal_id);
 
@@ -1040,7 +1042,9 @@ pub mod pallet {
 
 			if proposal.number_of_votes.aye.len() < number_of_votes / 2 ||
 				proposal.number_of_votes.aye.len() == 0 &&
-					proposal.number_of_votes.nay.len() == 0
+					proposal.number_of_votes.nay.len() == 0 ||
+				proposal.number_of_votes.aye.len() == 0 &&
+					proposal.number_of_votes.nay.len() == 1
 			{
 				Self::deposit_event(Event::ProposalDidNotPass { proposal_id });
 

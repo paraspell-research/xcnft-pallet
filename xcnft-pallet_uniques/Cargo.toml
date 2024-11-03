@@ -1,5 +1,5 @@
 [package]
-name = "pallet-parachain-xcnft-two"
+name = "pallet-parachain-xcnft"
 authors = ["ParaSpell Research"]
 description = "Pallet for NFT sharing using XCM."
 version = "0.1.0"
@@ -28,6 +28,7 @@ enumflags2 = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
+xcm-builder = { workspace = true, default-features = false }
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
@@ -68,6 +69,7 @@ std = [
 	"cumulus-primitives-core/std",
 	"sp-std/std",
 	"xcm/std",
+	"xcm-builder/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
