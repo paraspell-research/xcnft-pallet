@@ -104,6 +104,13 @@ Head over to [User guide](https://paraspell-research.github.io/xcnft-docs/user-g
 
 To test the pallet we constructed various unit tests with variations of data. To run these tests use command:
 
+Clone the [following repository](https://github.com/paraspell-research/polkadot-sdk) and run the following commands:
+
+`cargo test --package pallet-parachain-xcnft --lib -- tests --nocapture` 
+
+`cargo test --package pallet-parachain-xcnft-two --lib -- tests --nocapture`
+
+**Soon** (After pallet_nfts and pallet_uniques get released to newest version):
 Choose pallet version and go to it's folder:
 `cd xcnft-pallet_nfts || xcnft-pallet_uniques`
 
