@@ -1,8 +1,7 @@
 /// Code originates from pallet_nfts
-/// 
+///
 /// Used to mimic CollectionConfigFor parameter from NFTs pallet
-/// 
-/// 
+///
 macro_rules! impl_codec_bitflags {
 	($wrapper:ty, $size:ty, $bitflag_enum:ty) => {
 		impl MaxEncodedLen for $wrapper {

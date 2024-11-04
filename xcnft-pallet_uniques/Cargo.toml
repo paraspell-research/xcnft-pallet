@@ -1,5 +1,5 @@
 [package]
-name = "pallet-parachain-xcnft"
+name = "pallet-parachain-xcnft-two"
 authors = ["ParaSpell Research"]
 description = "Pallet for NFT sharing using XCM."
 version = "0.1.0"
@@ -49,6 +49,17 @@ sp-io = { workspace = true, default-features = true }
 
 pallet-balances = { workspace = true, default-features = true }
 
+# For unit tests
+xcm-builder = { workspace = true, default-features = true }
+xcm-simulator = { workspace = true, default-features = true }
+xcm-executor = { workspace = true, default-features = true }
+sp-tracing = { workspace = true, default-features = true }
+pallet-xcm = { workspace = true, default-features = true }
+polkadot-core-primitives = { workspace = true, default-features = true }
+polkadot-runtime-parachains = { workspace = true, default-features = true }
+polkadot-parachain-primitives = { workspace = true, default-features = true }
+pallet-message-queue = { workspace = true, default-features = true }
+
 [features]
 default = [ "std" ]
 runtime-benchmarks = [
@@ -56,17 +67,24 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+	"xcm-builder/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"pallet-uniques/runtime-benchmarks",
+	"pallet-xcm/runtime-benchmarks",
+	"pallet-message-queue/runtime-benchmarks",
+	"polkadot-parachain-primitives/runtime-benchmarks",
+	"polkadot-runtime-parachains/runtime-benchmarks",
+	"xcm-executor/runtime-benchmarks",
 ]
 std = [
 	"codec/std",
 	"scale-info/std",
-	"pallet-uniques/std",
 	"frame-benchmarking?/std",
 	"frame-support/std",
 	"frame-system/std",
+	"pallet-uniques/std",
 	"sp-runtime/std",
-	"cumulus-pallet-xcm/std",
-	"cumulus-primitives-core/std",
 	"sp-std/std",
 	"xcm/std",
 	"xcm-builder/std",

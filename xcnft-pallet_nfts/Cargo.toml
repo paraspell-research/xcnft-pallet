@@ -28,7 +28,6 @@ frame-system = { workspace = true }
 
 #XCM
 xcm = { workspace = true}
-xcm-builder = { workspace = true, default-features = false }
 
 cumulus-primitives-core = { workspace = true }
 cumulus-pallet-xcm = { workspace = true }
@@ -49,8 +48,16 @@ sp-io = { workspace = true, default-features = true }
 
 pallet-balances = { workspace = true, default-features = true }
 
-
-
+# For unit tests
+xcm-builder = { workspace = true, default-features = true }
+xcm-simulator = { workspace = true, default-features = true }
+xcm-executor = { workspace = true, default-features = true }
+sp-tracing = { workspace = true, default-features = true }
+pallet-xcm = { workspace = true, default-features = true }
+polkadot-core-primitives = { workspace = true, default-features = true }
+polkadot-runtime-parachains = { workspace = true, default-features = true }
+polkadot-parachain-primitives = { workspace = true, default-features = true }
+pallet-message-queue = { workspace = true, default-features = true }
 
 [features]
 default = [ "std" ]
@@ -63,6 +70,11 @@ runtime-benchmarks = [
 	"xcm-builder/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-nfts/runtime-benchmarks",
+	"pallet-xcm/runtime-benchmarks",
+	"pallet-message-queue/runtime-benchmarks",
+	"polkadot-parachain-primitives/runtime-benchmarks",
+	"polkadot-runtime-parachains/runtime-benchmarks",
+	"xcm-executor/runtime-benchmarks",
 ]
 std = [
 	"codec/std",
