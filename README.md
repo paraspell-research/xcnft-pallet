@@ -104,10 +104,8 @@ Head over to [User guide](https://paraspell-research.github.io/xcnft-docs/user-g
 
 To test the pallet we constructed various unit tests with variations of data. To run these tests use command:
 
-`cargo test --package pallet-parachain-xnft --lib -- tests --nocapture`
+Choose pallet version and go to it's folder:
+`cd xcnft-pallet_nfts || xcnft-pallet_uniques`
 
-To run benchmarks you can use: 
-
-`cargo test --package pallet-parachain-xnft --lib -- tests --nocapture `
-
-**Both of these tests require pallet to be implemented into runtime already.**
+Run tests and benchmarks
+`cargo test `
