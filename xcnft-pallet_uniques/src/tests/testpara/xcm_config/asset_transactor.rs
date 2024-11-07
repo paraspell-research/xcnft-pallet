@@ -15,11 +15,11 @@
 // along with Polkadot.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::tests::testpara::{
-	constants::KsmLocation, location_converter::LocationConverter, AccountId, Balances
+	constants::KsmLocation, location_converter::LocationConverter, AccountId, Balances,
 };
-use xcm_builder::{FungibleAdapter, IsConcrete
-};
+use xcm_builder::{FungibleAdapter, IsConcrete};
 
-type LocalAssetTransactor = FungibleAdapter<Balances, IsConcrete<KsmLocation>, LocationConverter, AccountId, ()>;
+type LocalAssetTransactor =
+	FungibleAdapter<Balances, IsConcrete<KsmLocation>, LocationConverter, AccountId, ()>;
 
 pub type AssetTransactor = LocalAssetTransactor;

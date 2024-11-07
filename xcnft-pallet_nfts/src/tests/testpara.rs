@@ -23,15 +23,16 @@ use parachain_info;
 
 use core::marker::PhantomData;
 use frame_support::{
-	construct_runtime, derive_impl, parameter_types,
+	construct_runtime, derive_impl,
+	pallet_prelude::Get,
+	parameter_types,
 	traits::{ConstU128, ContainsPair, EnsureOrigin, EnsureOriginWithArg, Everything, Nothing},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
-use frame_support::pallet_prelude::Get;
 use frame_system::{EnsureRoot, EnsureSigned};
 use sp_core::ConstU32;
 use sp_runtime::{
-	traits::{ConstU64, Verify, IdentityLookup},
+	traits::{ConstU64, IdentityLookup, Verify},
 	AccountId32, BuildStorage, MultiSignature,
 };
 use xcm::latest::prelude::*;
@@ -61,12 +62,11 @@ impl pallet_balances::Config for Runtime {
 	type AccountStore = System;
 }
 
-
 pub const UNIT: Balance = 1;
 parameter_types! {
 	pub const CollectionDeposit: Balance = 0 * UNIT; // 1 UNIT deposit to create asset collection
 	pub const ItemDeposit: Balance = 0 * UNIT; // 1/100 UNIT deposit to create asset item
-	pub const KeyLimit: u32 = 32;	
+	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 64;
 	pub const UniquesMetadataDepositBase: Balance = 0 * UNIT;
 	pub const AttributeDepositBase: Balance = 0 * UNIT;
@@ -109,6 +109,8 @@ impl pallet_nfts::Config for Runtime {
 	type Features = NftFeatures;
 	type OffchainSignature = MultiSignature;
 	type OffchainPublic = AccountPublic;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = ();
 	type WeightInfo = ();
 }
 
@@ -191,7 +193,7 @@ impl pallet_xcm::Config for Runtime {
 
 impl crate::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type WeightInfo = ();
+	type WeightInfo = crate::weights::SubstrateWeight<Runtime>;
 	type XcmSender = XcmRouter;
 	type RuntimeCall = RuntimeCall;
 	type ProposalTimeInBlocks = proposal_time_in_blocks_parameter;
@@ -208,8 +210,8 @@ construct_runtime!(
 		Balances: pallet_balances,
 		MsgQueue: mock_message_queue,
 		PolkadotXcm: pallet_xcm,
-        NFTs: pallet_nfts,
-        XcNFT: crate,
-        ParachainInfo: parachain_info,
+		NFTs: pallet_nfts,
+		XcNFT: crate,
+		ParachainInfo: parachain_info,
 	}
 );

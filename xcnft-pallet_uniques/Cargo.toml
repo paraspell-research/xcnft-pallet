@@ -4,7 +4,7 @@ authors = ["ParaSpell Research"]
 description = "Pallet for NFT sharing using XCM."
 version = "0.1.0"
 license = "MIT"
-homepage = "https://docs.paraspell.io"
+homepage = "https://paraspell-research.github.io/xcnft-docs/"
 repository.workspace = true
 edition.workspace = true
 

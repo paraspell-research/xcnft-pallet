@@ -27,13 +27,16 @@ use frame_support::{
 	weights::{Weight, WeightMeter},
 };
 
-use frame_system::{EnsureRoot,EnsureSigned};
-use sp_core::ConstU32;
-use sp_runtime::{traits::{Verify,IdentityLookup}, AccountId32,MultiSignature};
+use frame_system::{EnsureRoot, EnsureSigned};
 use polkadot_runtime_parachains::{
 	configuration,
 	inclusion::{AggregateMessageOrigin, UmpQueueId},
 	origin, shared,
+};
+use sp_core::ConstU32;
+use sp_runtime::{
+	traits::{IdentityLookup, Verify},
+	AccountId32, MultiSignature,
 };
 use xcm::latest::prelude::*;
 use xcm_builder::{IsConcrete, SignedToAccountId32};
@@ -65,7 +68,7 @@ pub const UNIT: Balance = 1;
 parameter_types! {
 	pub const CollectionDeposit: Balance = 0 * UNIT; // 1 UNIT deposit to create asset collection
 	pub const ItemDeposit: Balance = 0 * UNIT; // 1/100 UNIT deposit to create asset item
-	pub const KeyLimit: u32 = 32;	
+	pub const KeyLimit: u32 = 32;
 	pub const ValueLimit: u32 = 64;
 	pub const UniquesMetadataDepositBase: Balance = 0 * UNIT;
 	pub const AttributeDepositBase: Balance = 0 * UNIT;
@@ -97,6 +100,8 @@ impl pallet_uniques::Config for Runtime {
 	type StringLimit = UniquesStringLimit;
 	type KeyLimit = KeyLimit;
 	type ValueLimit = ValueLimit;
+	#[cfg(feature = "runtime-benchmarks")]
+	type Helper = ();
 	type WeightInfo = ();
 }
 

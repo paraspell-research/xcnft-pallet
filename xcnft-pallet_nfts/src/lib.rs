@@ -51,7 +51,6 @@
 //!
 //! Substrate Pallets:
 //! - `pallet-nfts`
-//! - `pallet-uniques`
 //! - `pallet-balances`
 //! - `parachain-info`
 
@@ -66,7 +65,7 @@ pub mod tests;
 
 pub mod weights;
 
-#[cfg(feature = "runtime-benchmarks")]
+#[cfg_attr(feature = "runtime-benchmarks", recursion_limit = "256")]
 mod benchmarking;
 
 #[frame_support::pallet]

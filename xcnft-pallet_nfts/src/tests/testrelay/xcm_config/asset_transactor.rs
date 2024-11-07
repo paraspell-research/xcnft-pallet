@@ -23,6 +23,7 @@ use xcm_builder::{
 };
 use xcm_executor::traits::JustTry;
 
-type LocalAssetTransactor = FungibleAdapter<Balances, IsConcrete<TokenLocation>, LocationConverter, AccountId, ()>;
+type LocalAssetTransactor =
+	FungibleAdapter<Balances, IsConcrete<TokenLocation>, LocationConverter, AccountId, ()>;
 
 pub type AssetTransactor = LocalAssetTransactor;

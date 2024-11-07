@@ -6,19 +6,19 @@ use crate::{
 pub mod testpara;
 pub mod testrelay;
 
-use frame_support::assert_noop;
-use sp_runtime::{AccountId32, BoundedVec, BuildStorage};
 use cumulus_primitives_core::Parachain;
-use xcm_executor::traits::ConvertLocation;
-use xcm::prelude::*;
+use frame_support::assert_noop;
 use pallet_uniques;
+use sp_runtime::{AccountId32, BoundedVec, BuildStorage};
+use xcm::prelude::*;
+use xcm_executor::traits::ConvertLocation;
 
 pub const ALICE: AccountId32 = AccountId32::new([0u8; 32]);
 pub const BOB: AccountId32 = AccountId32::new([1u8; 32]);
 pub const INITIAL_BALANCE: u128 = 1_000_000_000;
 
-use xcm_simulator::{decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt};
 use sp_tracing;
+use xcm_simulator::{decl_test_network, decl_test_parachain, decl_test_relay_chain, TestExt};
 
 pub fn parent_account_id() -> testpara::AccountId {
 	let location = (Parent,);
@@ -70,8 +70,6 @@ decl_test_network! {
 	}
 }
 
-
-
 pub fn para_ext(para_id: u32) -> sp_io::TestExternalities {
 	use testpara::{MsgQueue, Runtime, System};
 
@@ -93,7 +91,7 @@ pub fn para_ext(para_id: u32) -> sp_io::TestExternalities {
 }
 
 pub fn relay_ext() -> sp_io::TestExternalities {
-	use testrelay::{Runtime, RuntimeOrigin, System, NFTs};
+	use testrelay::{NFTs, Runtime, RuntimeOrigin, System};
 
 	let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 
@@ -127,11 +125,16 @@ fn try_sending_collection_empty_success() {
 			0,
 			Some(COLLECTION_ID),
 			2000.into(),
-			None
+			None,
 		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionTransferred { origin_collection_id: 0, origin_collection_metadata: BoundedVec::new(), destination_para_id: 2000.into()}));
-
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionTransferred {
+				origin_collection_id: 0,
+				origin_collection_metadata: BoundedVec::new(),
+				destination_para_id: 2000.into(),
+			},
+		));
 	});
 }
 
@@ -142,7 +145,7 @@ fn try_sending_collection_same_owner_success() {
 		const COLLECTION_ID: u32 = 1;
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
-		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0,ALICE);
+		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 1, ALICE);
 
 		let _ = testpara::XcNFT::collection_x_transfer(
@@ -150,13 +153,18 @@ fn try_sending_collection_same_owner_success() {
 			0,
 			Some(COLLECTION_ID),
 			2000.into(),
-			None
+			None,
 		);
 
 		let nft_ids = vec![0, 1];
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionAndNFTsTransferred { origin_collection_id: 0, nft_ids, destination_para_id: 2000.into()}));
-
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionAndNFTsTransferred {
+				origin_collection_id: 0,
+				nft_ids,
+				destination_para_id: 2000.into(),
+			},
+		));
 	});
 }
 
@@ -167,7 +175,7 @@ fn try_sending_collection_different_owners_success() {
 		const COLLECTION_ID: u32 = 1;
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
-		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0,ALICE);
+		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 1, BOB);
 
 		let _ = testpara::XcNFT::collection_x_transfer(
@@ -175,11 +183,17 @@ fn try_sending_collection_different_owners_success() {
 			0,
 			Some(COLLECTION_ID),
 			2000.into(),
-			None
+			None,
 		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionTransferProposalCreated { proposal_id: 0, collection_id: 0, proposer: ALICE, destination: 2000.into()}));
-
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionTransferProposalCreated {
+				proposal_id: 0,
+				collection_id: 0,
+				proposer: ALICE,
+				destination: 2000.into(),
+			},
+		));
 	});
 }
 
@@ -204,14 +218,17 @@ fn try_sending_collection_that_user_doesnt_own() {
 	});
 }
 
-
 #[test]
 fn try_voting_on_non_existing_proposal() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(1);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 0, crate::Vote::Aye),
+			testpara::XcNFT::collection_x_transfer_vote(
+				testpara::RuntimeOrigin::signed(ALICE),
+				0,
+				crate::Vote::Aye
+			),
 			Error::<Test>::ProposalDoesNotExist
 		);
 	});
@@ -239,7 +256,11 @@ fn try_voting_on_proposal_when_no_owner() {
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(BOB), 1, crate::Vote::Aye),
+			testpara::XcNFT::collection_x_transfer_vote(
+				testpara::RuntimeOrigin::signed(BOB),
+				1,
+				crate::Vote::Aye
+			),
 			Error::<Test>::NotNFTOwner
 		);
 	});
@@ -270,10 +291,15 @@ fn try_voting_on_proposal_expired() {
 
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
-		let _ =
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 1, crate::Vote::Aye);
+		let _ = testpara::XcNFT::collection_x_transfer_vote(
+			testpara::RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Aye,
+		);
 
-			testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::ProposalExpired { proposal_id: 1 }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::ProposalExpired {
+			proposal_id: 1,
+		}));
 	});
 }
 
@@ -302,12 +328,15 @@ fn try_voting_on_proposal_did_not_pass() {
 
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
-		let _ =
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 1, crate::Vote::Aye);
+		let _ = testpara::XcNFT::collection_x_transfer_vote(
+			testpara::RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Aye,
+		);
 
-			testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::ProposalDidNotPass {
-			proposal_id: 1,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::ProposalDidNotPass { proposal_id: 1 },
+		));
 	});
 }
 
@@ -336,11 +365,18 @@ fn try_voting_on_proposal_again_same_vote() {
 
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
-		let _ =
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 1, crate::Vote::Aye);
+		let _ = testpara::XcNFT::collection_x_transfer_vote(
+			testpara::RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Aye,
+		);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 1, crate::Vote::Aye),
+			testpara::XcNFT::collection_x_transfer_vote(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1,
+				crate::Vote::Aye
+			),
 			Error::<Test>::AlreadyVotedThis
 		);
 	});
@@ -371,14 +407,19 @@ fn vote_on_proposal_successfuly() {
 
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
-		let _ =
-		testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 1, crate::Vote::Aye);
+		let _ = testpara::XcNFT::collection_x_transfer_vote(
+			testpara::RuntimeOrigin::signed(ALICE),
+			1,
+			crate::Vote::Aye,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CrossChainPropoposalVoteRegistered {
-			proposal_id: 1,
-			voter: ALICE,
-			vote: crate::Vote::Aye,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CrossChainPropoposalVoteRegistered {
+				proposal_id: 1,
+				voter: ALICE,
+				vote: crate::Vote::Aye,
+			},
+		));
 	});
 }
 
@@ -389,7 +430,7 @@ fn initiate_proposal_successfuly() {
 		const COLLECTION_ID: u32 = 1;
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
-		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0,ALICE);
+		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 1, BOB);
 
 		let _ = testpara::XcNFT::collection_x_transfer(
@@ -397,19 +438,32 @@ fn initiate_proposal_successfuly() {
 			0,
 			Some(COLLECTION_ID),
 			2000.into(),
-			None
+			None,
 		);
 
-		let _ = testpara::XcNFT::collection_x_transfer_vote(testpara::RuntimeOrigin::signed(ALICE), 0, crate::Vote::Aye);
+		let _ = testpara::XcNFT::collection_x_transfer_vote(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			crate::Vote::Aye,
+		);
 
 		testpara::System::set_block_number(11);
 
-		let _ = testpara::XcNFT::collection_x_transfer_initiate(testpara::RuntimeOrigin::signed(ALICE), 0);
+		let _ = testpara::XcNFT::collection_x_transfer_initiate(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+		);
 
 		let nfts = vec![(0, ALICE, BoundedVec::new()), (1, BOB, BoundedVec::new())];
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionAndNFTsDiffTransferred { origin_collection_id: 0, nfts: nfts, destination_para_id: 2000.into(), to_address: ALICE }));
-
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionAndNFTsDiffTransferred {
+				origin_collection_id: 0,
+				nfts,
+				destination_para_id: 2000.into(),
+				to_address: ALICE,
+			},
+		));
 	});
 }
 
@@ -419,7 +473,10 @@ fn try_initiating_proposal_doesnt_exist() {
 		testpara::System::set_block_number(1);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_initiate(testpara::RuntimeOrigin::signed(ALICE), 1),
+			testpara::XcNFT::collection_x_transfer_initiate(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1
+			),
 			Error::<Test>::ProposalDoesNotExist
 		);
 	});
@@ -452,7 +509,10 @@ fn try_initiating_proposal_collection_doesnt_exist() {
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_initiate(testpara::RuntimeOrigin::signed(ALICE), 1),
+			testpara::XcNFT::collection_x_transfer_initiate(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1
+			),
 			Error::<Test>::CollectionDoesNotExist
 		);
 	});
@@ -485,7 +545,10 @@ fn try_initiating_proposal_no_collection_owner() {
 		let _ = crate::CrossChainProposals::insert(1, proposal);
 
 		assert_noop!(
-			testpara::XcNFT::collection_x_transfer_initiate(testpara::RuntimeOrigin::signed(ALICE), 1),
+			testpara::XcNFT::collection_x_transfer_initiate(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1
+			),
 			Error::<Test>::NotCollectionOwner
 		);
 	});
@@ -516,24 +579,41 @@ fn try_initiating_proposal_that_did_not_pass() {
 		};
 
 		let _ = crate::CrossChainProposals::insert(1, proposal);
-		let _ = testpara::XcNFT::collection_x_transfer_initiate(testpara::RuntimeOrigin::signed(ALICE), 1);
+		let _ = testpara::XcNFT::collection_x_transfer_initiate(
+			testpara::RuntimeOrigin::signed(ALICE),
+			1,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::ProposalDidNotPass { proposal_id: 1 }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::ProposalDidNotPass { proposal_id: 1 },
+		));
 	});
 }
 
 #[test]
 fn try_sending_nft_successful() {
-
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
-		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0,ALICE);
+		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 
-		let _ = testpara::XcNFT::nft_x_transfer(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into(), 1, 1);
+		let _ = testpara::XcNFT::nft_x_transfer(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			0,
+			1000.into(),
+			1,
+			1,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTTransferred { origin_collection_id: 0, origin_asset_id: 0, destination_para_id: 1000.into(), destination_collection_id: 1, destination_asset_id: 1 }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTTransferred {
+			origin_collection_id: 0,
+			origin_asset_id: 0,
+			destination_para_id: 1000.into(),
+			destination_collection_id: 1,
+			destination_asset_id: 1,
+		}));
 	});
 }
 
@@ -543,7 +623,14 @@ fn try_sending_nft_no_collection() {
 		testpara::System::set_block_number(2);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_transfer(testpara::RuntimeOrigin::signed(ALICE), 1, 0, 1000.into(), 1, 1),
+			testpara::XcNFT::nft_x_transfer(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1,
+				0,
+				1000.into(),
+				1,
+				1
+			),
 			Error::<Test>::CollectionDoesNotExist
 		);
 	});
@@ -557,7 +644,14 @@ fn try_sending_nft_no_nft() {
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_transfer(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into(), 1, 1),
+			testpara::XcNFT::nft_x_transfer(
+				testpara::RuntimeOrigin::signed(ALICE),
+				0,
+				0,
+				1000.into(),
+				1,
+				1
+			),
 			Error::<Test>::NFTDoesNotExist
 		);
 	});
@@ -573,7 +667,14 @@ fn try_sending_nft_not_nft_owner() {
 		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_transfer(testpara::RuntimeOrigin::signed(BOB), 0, 0, 1000.into(), 1, 1),
+			testpara::XcNFT::nft_x_transfer(
+				testpara::RuntimeOrigin::signed(BOB),
+				0,
+				0,
+				1000.into(),
+				1,
+				1
+			),
 			Error::<Test>::NotNFTOwner
 		);
 	});
@@ -585,7 +686,14 @@ fn try_claiming_nft_no_collection() {
 		testpara::System::set_block_number(2);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(ALICE), 1u32, 0u32, 100u32.into(), 1u32, 1u32),
+			testpara::XcNFT::nft_x_claim(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1u32,
+				0u32,
+				100u32.into(),
+				1u32,
+				1u32
+			),
 			Error::<Test>::CollectionDoesNotExist
 		);
 	});
@@ -599,7 +707,14 @@ fn try_claiming_nft_no_collection_origin() {
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(ALICE), 1u32, 0u32, 100u32.into(), 1u32, 1u32),
+			testpara::XcNFT::nft_x_claim(
+				testpara::RuntimeOrigin::signed(ALICE),
+				1u32,
+				0u32,
+				100u32.into(),
+				1u32,
+				1u32
+			),
 			Error::<Test>::CollectionDoesNotExist
 		);
 	});
@@ -621,7 +736,14 @@ fn try_claiming_nft_wrong_origin_collection() {
 		let _ = ReceivedCollections::<Test>::insert(0, collections);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(ALICE), 0u32, 0u32, 100u32.into(), 0u32, 1u32),
+			testpara::XcNFT::nft_x_claim(
+				testpara::RuntimeOrigin::signed(ALICE),
+				0u32,
+				0u32,
+				100u32.into(),
+				0u32,
+				1u32
+			),
 			Error::<Test>::WrongOriginCollectionAtOrigin
 		);
 	});
@@ -631,7 +753,6 @@ fn try_claiming_nft_wrong_origin_collection() {
 fn try_claiming_nft_wrong_nft() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
-
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
 
@@ -644,7 +765,14 @@ fn try_claiming_nft_wrong_nft() {
 		let _ = ReceivedCollections::<Test>::insert(0, collections);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(ALICE), 0u32, 0u32, 100u32.into(), 0u32, 0u32),
+			testpara::XcNFT::nft_x_claim(
+				testpara::RuntimeOrigin::signed(ALICE),
+				0u32,
+				0u32,
+				100u32.into(),
+				0u32,
+				0u32
+			),
 			Error::<Test>::NFTNotReceived
 		);
 	});
@@ -682,7 +810,14 @@ fn try_claiming_nft_not_owner() {
 		let _ = ReceivedAssets::<Test>::insert((1, 0), nfts);
 
 		assert_noop!(
-			testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(BOB), 0u32, 0u32, 0u32, 1u32, 0u32),
+			testpara::XcNFT::nft_x_claim(
+				testpara::RuntimeOrigin::signed(BOB),
+				0u32,
+				0u32,
+				0u32,
+				1u32,
+				0u32
+			),
 			Error::<Test>::NotNFTOwner
 		);
 	});
@@ -720,7 +855,14 @@ fn try_claiming_nft_success() {
 		let _ = ReceivedAssets::<Test>::insert((1, 0), nfts);
 		testpara::System::set_block_number(3);
 
-		let _ = testpara::XcNFT::nft_x_claim(testpara::RuntimeOrigin::signed(ALICE), 0u32, 0u32, 0u32, 1u32, 0u32);
+		let _ = testpara::XcNFT::nft_x_claim(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0u32,
+			0u32,
+			0u32,
+			1u32,
+			0u32,
+		);
 
 		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTClaimed {
 			collection_claimed_from: 1,
@@ -744,11 +886,13 @@ fn try_collection_parse_empty_successful() {
 			None,
 		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionReceived {
-			origin_collection_id: 1,
-			received_collection_id: 1,
-			to_address: ALICE,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionReceived {
+				origin_collection_id: 1,
+				received_collection_id: 1,
+				to_address: ALICE,
+			},
+		));
 	});
 }
 
@@ -762,11 +906,15 @@ fn try_parse_collection_burn_successful() {
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
 
-		let _ = testpara::XcNFT::parse_collection_burn(testpara::RuntimeOrigin::signed(ALICE), 0, destroy_witness);
+		let _ = testpara::XcNFT::parse_collection_burn(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			destroy_witness,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::Destroyed {
-			collection: 0,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
+			pallet_uniques::Event::Destroyed { collection: 0 },
+		));
 	});
 }
 
@@ -777,14 +925,19 @@ fn try_parse_collection_metadata_successful() {
 
 		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), 0, ALICE);
 
-		let _ =
-		testpara::XcNFT::parse_collection_metadata(testpara::RuntimeOrigin::signed(ALICE), 0, BoundedVec::new());
+		let _ = testpara::XcNFT::parse_collection_metadata(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			BoundedVec::new(),
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::CollectionMetadataSet {
-			collection: 0,
-			data: BoundedVec::new(),
-			is_frozen: false,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
+			pallet_uniques::Event::CollectionMetadataSet {
+				collection: 0,
+				data: BoundedVec::new(),
+				is_frozen: false,
+			},
+		));
 	});
 }
 
@@ -799,11 +952,9 @@ fn try_parse_nft_burn_successful() {
 
 		let _ = testpara::XcNFT::parse_nft_burn(testpara::RuntimeOrigin::signed(ALICE), 0, 0);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::Burned {
-			collection: 0,
-			item: 0,
-			owner: ALICE,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
+			pallet_uniques::Event::Burned { collection: 0, item: 0, owner: ALICE },
+		));
 	});
 }
 
@@ -816,14 +967,21 @@ fn try_parse_nft_metadata_successful() {
 
 		let _ = testpara::NFTs::mint(testpara::RuntimeOrigin::signed(ALICE), 0, 0, ALICE);
 
-		let _ = testpara::XcNFT::parse_nft_metadata(testpara::RuntimeOrigin::signed(ALICE), 0, 0, BoundedVec::new());
+		let _ = testpara::XcNFT::parse_nft_metadata(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			0,
+			BoundedVec::new(),
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::MetadataSet {
-			collection: 0,
-			item: 0,
-			data: BoundedVec::new(),
-			is_frozen: false
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
+			pallet_uniques::Event::MetadataSet {
+				collection: 0,
+				item: 0,
+				data: BoundedVec::new(),
+				is_frozen: false,
+			},
+		));
 	});
 }
 
@@ -838,12 +996,9 @@ fn try_parse_nft_owner_successful() {
 
 		let _ = testpara::XcNFT::parse_nft_owner(testpara::RuntimeOrigin::signed(ALICE), BOB, 0, 0);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(pallet_uniques::Event::Transferred {
-			collection: 0,
-			item: 0,
-			from: ALICE,
-			to: BOB,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
+			pallet_uniques::Event::Transferred { collection: 0, item: 0, from: ALICE, to: BOB },
+		));
 	});
 }
 
@@ -1001,11 +1156,13 @@ fn try_parse_nft_transfer_return_to_origin() {
 			0,
 			ParachainInfo::parachain_id(),
 		);
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTReturnedToOrigin {
-			returned_from_collection_id: 0,
-			returned_from_asset_id: 0,
-			to_address: ALICE,
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::NFTReturnedToOrigin {
+				returned_from_collection_id: 0,
+				returned_from_asset_id: 0,
+				to_address: ALICE,
+			},
+		));
 	});
 }
 
@@ -1026,10 +1183,9 @@ fn parse_collection_same_owner_successful() {
 			0,
 			None,
 		);
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionWithNftsReceived {
-			collection_id: 0,
-			items: nfts.clone(),
-		}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionWithNftsReceived { collection_id: 0, items: nfts.clone() },
+		));
 	});
 }
 
@@ -1038,7 +1194,8 @@ fn parse_collection_diff_nft_owners_successful() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let mut nfts: Vec<(u32, AccountId32, BoundedVec<u8, testpara::UniquesStringLimit>)> = Vec::new();
+		let mut nfts: Vec<(u32, AccountId32, BoundedVec<u8, testpara::UniquesStringLimit>)> =
+			Vec::new();
 		nfts.push((1, BOB, BoundedVec::new()));
 
 		let _ = testpara::XcNFT::parse_collection_diff_owners(
@@ -1057,37 +1214,72 @@ fn parse_collection_diff_nft_owners_successful() {
 }
 
 #[test]
-fn try_collection_metadata_success(){
+fn try_collection_metadata_success() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let _ = testpara::XcNFT::collection_x_update(testpara::RuntimeOrigin::signed(ALICE), 0, 1000.into(), BoundedVec::new());
+		let _ = testpara::XcNFT::collection_x_update(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			1000.into(),
+			BoundedVec::new(),
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionMetadataSent { collection_id: 0, proposed_data: BoundedVec::new(), owner: ALICE, destination: 1000.into()}));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionMetadataSent {
+				collection_id: 0,
+				proposed_data: BoundedVec::new(),
+				owner: ALICE,
+				destination: 1000.into(),
+			},
+		));
 	});
 }
 
 #[test]
-fn try_collection_owner_send_success(){
+fn try_collection_owner_send_success() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let _ = testpara::XcNFT::collection_x_change_owner(testpara::RuntimeOrigin::signed(ALICE), 0, 1000.into(), BOB);
+		let _ = testpara::XcNFT::collection_x_change_owner(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			1000.into(),
+			BOB,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionOwnershipSent { collection_id: 0, proposed_owner: BOB, destination: 1000.into() }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionOwnershipSent {
+				collection_id: 0,
+				proposed_owner: BOB,
+				destination: 1000.into(),
+			},
+		));
 	});
 }
 
 #[test]
-fn try_collection_burn_success(){
+fn try_collection_burn_success() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
 		let witness = GeneralizedDestroyWitness { item_meta: 0, item_configs: 0, attributes: 0 };
 
-		let _ = testpara::XcNFT::collection_x_burn(testpara::RuntimeOrigin::signed(ALICE), 0, 1000.into(), witness.clone());
+		let _ = testpara::XcNFT::collection_x_burn(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			1000.into(),
+			witness.clone(),
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::CollectionBurnSent { collection_id: 0, burn_data: witness.clone(), owner: ALICE, destination: 1000.into() }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::CollectionBurnSent {
+				collection_id: 0,
+				burn_data: witness.clone(),
+				owner: ALICE,
+				destination: 1000.into(),
+			},
+		));
 	});
 }
 
@@ -1096,9 +1288,21 @@ fn try_nft_metadata_successful() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let _ = testpara::XcNFT::nft_x_update(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into(), BoundedVec::new());
+		let _ = testpara::XcNFT::nft_x_update(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			0,
+			1000.into(),
+			BoundedVec::new(),
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTMetadataSent { collection_id: 0, asset_id: 0, proposed_data: BoundedVec::new(), owner: ALICE, destination: 1000.into() }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTMetadataSent {
+			collection_id: 0,
+			asset_id: 0,
+			proposed_data: BoundedVec::new(),
+			owner: ALICE,
+			destination: 1000.into(),
+		}));
 	});
 }
 
@@ -1107,9 +1311,22 @@ fn try_nft_owner_successful() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let _ = testpara::XcNFT::nft_x_change_owner(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into(), BOB);
+		let _ = testpara::XcNFT::nft_x_change_owner(
+			testpara::RuntimeOrigin::signed(ALICE),
+			0,
+			0,
+			1000.into(),
+			BOB,
+		);
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTOwnershipSent { collection_id: 0, asset_id: 0, proposed_owner: BOB, destination: 1000.into() }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(
+			Event::NFTOwnershipSent {
+				collection_id: 0,
+				asset_id: 0,
+				proposed_owner: BOB,
+				destination: 1000.into(),
+			},
+		));
 	});
 }
 
@@ -1118,8 +1335,14 @@ fn try_nft_burn_successful() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
 
-		let _ = testpara::XcNFT::nft_x_burn(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into());
+		let _ =
+			testpara::XcNFT::nft_x_burn(testpara::RuntimeOrigin::signed(ALICE), 0, 0, 1000.into());
 
-		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTBurnSent { collection_id: 0, asset_id: 0, owner: ALICE, destination: 1000.into() }));
+		testpara::System::assert_has_event(testpara::RuntimeEvent::XcNFT(Event::NFTBurnSent {
+			collection_id: 0,
+			asset_id: 0,
+			owner: ALICE,
+			destination: 1000.into(),
+		}));
 	});
 }
