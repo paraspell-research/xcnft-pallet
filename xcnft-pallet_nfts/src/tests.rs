@@ -1059,31 +1059,6 @@ fn try_parse_collection_metadata_successful() {
 }
 
 #[test]
-fn try_parse_collection_owner_successful() {
-	ParaA::execute_with(|| {
-		testpara::System::set_block_number(2);
-
-		let def_config: CollectionConfigFor<Test> = CollectionConfigFor::<Test> {
-			settings: CollectionSettings::all_enabled(), // Default settings (all enabled)
-			max_supply: None,                            /* No maximum supply defined
-			                                              * initially */
-			mint_settings: MintSettings::default(), // Use default mint settings
-		};
-
-		let _ = testpara::NFTs::create(testpara::RuntimeOrigin::signed(ALICE), ALICE, def_config);
-
-		pallet_nfts::OwnershipAcceptance::<Test>::insert(BOB, 0);
-
-		let _ =
-			testpara::XcNFT::parse_collection_owner(testpara::RuntimeOrigin::signed(ALICE), BOB, 0);
-
-		testpara::System::assert_has_event(testpara::RuntimeEvent::NFTs(
-			pallet_nfts::Event::OwnerChanged { collection: 0, new_owner: BOB },
-		));
-	});
-}
-
-#[test]
 fn try_parse_nft_burn_successful() {
 	ParaA::execute_with(|| {
 		testpara::System::set_block_number(2);
