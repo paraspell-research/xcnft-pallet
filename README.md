@@ -116,3 +116,20 @@ Choose pallet version and go to it's folder:
 
 Run tests and benchmarks
 `cargo test `
+
+## License
+
+Made with 💛 by [ParaSpell-Research✨](https://github.com/paraspell-research)
+
+Published under [MIT License](https://github.com/paraspell-research/xcnft-pallet/blob/main/LICENSE).
+
+## Support
+
+<div align="center">
+ <p align="center">
+    <a href="https://github.com/w3f/Grants-Program/pull/2358">
+      <img width="200" alt="version" src="https://user-images.githubusercontent.com/55763425/211145923-f7ee2a57-3e63-4b7d-9674-2da9db46b2ee.png" />
+    </a>
+ </p>
+</div>
+
