@@ -1,14 +1,14 @@
 # Welcome fellow Parachain developer 🧙‍♂️ - meet xcNFT
 
-Following section will guide you through implementation of the xcNFT cross-chain pallet for non-fungible assets.
+The following section will guide you through the implementation of the xcNFT cross-chain pallet for non-fungible assets.
 
 Pallet docs - [[link]](https://paraspell-research.github.io/xcnft-docs/)
 
 ## Before your journey begins 🧳
 
-Before you begin with implementing this magical ✨ pallet into your Parachain, you must ensure, that you meet following pre-requirements:
+Before you begin with implementing this magical ✨ pallet into your Parachain, you must ensure that you meet fthe ollowing pre-requirements:
 
-### Your Parachain should implement following pallets:
+### Your Parachain should implement the following pallets:
 
 **Substrate:**
  - `frame-benchmarking`
@@ -50,20 +50,20 @@ No worries!
 **Try it out before you implement it!**
 
 ### Dockerized local testnet build:
-**Make sure your docker deamon is running**
+**Make sure your docker daemon is running**
 Copy the [Dockerfile](https://github.com/paraspell-research/xcnft-pallet/blob/main/Dockerfile) from this repository and input following commands:
 - `docker build --platform linux/x86_64 -t polkadot-sdk-image:latest .` to build Docker image
 - `docker run --platform linux/x86_64 -p 9910-9913:9910-9913 -p 9920-9921:9920-9921 --rm -it polkadot-sdk-image:latest` to start Zombienet.
 
 Once Zombienet is started, continue from step 8 in the next section.
 
-### Follow these steps to create local testnet that implements xcNFT:
+### Follow these steps to create a local testnet that implements xcNFT:
 
 1. Fork or clone [following repository](https://github.com/paraspell-research/polkadot-sdk)
 
 2. Download [Zombienet binary for your system](https://github.com/paritytech/zombienet/releases)
 
-3. Copy zombienet binary into binaries folder of the repository you just forked
+3. Copy Zombienet binary into the binaries folder of the repository you just forked
 
 4. Compile Relay chain by: 
 - `cd polkadot`
@@ -75,7 +75,7 @@ Once Zombienet is started, continue from step 8 in the next section.
 6. Compile second Parachain by:
 - `cargo b -r -p parachain-template-node-two`
 
-7. Launch zombienet localhost network by:
+7. Launch Zombienet localhost network by:
 - `cd binaries`
 - Choose config that you wish to test:
     - `./zombienet-macos-arm64 -p native -c 1 spawn config-both.toml` launches network with 1 Relay chain, 1 Parachain with *pallet_nfts* and 1 Parachain with *pallet_uniques* (Best for testing pallet agnosticity)
@@ -87,13 +87,13 @@ Once Zombienet is started, continue from step 8 in the next section.
 ![zombienet](https://github.com/user-attachments/assets/06f1d41e-55a7-4d7b-b7f3-f3e6fa276132)
 
 9. Open HRMP channels for both chains (Needed for allowing cross-chain communication):
-- Navigate to `Extrinsics` tab select `Alice` account and go to `Decode`
-    - Paste following hash to Decode section: `0xff00fa05e8030000e90300000800000000040000` (This hash opens channel from chain 1000 to 1001)
+- Navigate to `Extrinsics` tab select the `Alice` account and go to `Decode`
+    - Paste the following hash to the Decode section: `0xff00fa05e8030000e90300000800000000040000` (This hash opens the channel from chain 1000 to 1001)
     - Move back to Submission and sign the call with Alice
-    - Paste following hash to Decode section `0xff00fa05e9030000e80300000800000000040000` (This hash opens channel from chain 1001 to 1000)
+    - Paste the following hash to Decode section `0xff00fa05e9030000e80300000800000000040000` (This hash opens the channel from chain 1001 to 1000)
     - Move back to Submission and sign the call with Alice
 
-10. Start interacting with chains by connecting to their WS endpoints from Zombienet console and try xcNFT out.
+10. Start interacting with chains by connecting to their WS endpoints from the Zombienet console and try xcNFT out.
 
 Don't know which function does what? Unsure what storage stores what? 
 
@@ -102,7 +102,7 @@ Head over to [User guide](https://paraspell-research.github.io/xcnft-docs/user-g
 
 ## Other tests 🕹️
 
-To test the pallet we constructed various unit tests with variations of data. To run these tests use command:
+To test the pallet, we constructed various unit tests using variations of data. To run these tests use the command:
 
 Clone the [following repository](https://github.com/paraspell-research/polkadot-sdk) and run the following commands:
 
